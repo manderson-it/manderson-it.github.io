@@ -1,6 +1,6 @@
 +++
 title = 'Data Tracking Doggo Edition'
-date = 2024-04-11T08:27:09-05:00
+date = 2024-04-12T08:27:09-05:00
 draft = false
 +++
 ## Introduction
