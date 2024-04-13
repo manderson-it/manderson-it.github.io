@@ -34,7 +34,7 @@ I wanted to know how it would affect one of the most accessible clinical signs t
 
 My process was mostly about capturing data, preparing it, and visualizing it, which helped to inform conversations with his veterinarian. Due to my experience, I chose [Python](https://www.python.org/) with [pandas](https://pandas.pydata.org/), [numpy](https://numpy.org/), [matplotlib](https://matplotlib.org/), [pyplot](https://matplotlib.org/3.5.3/api/_as_gen/matplotlib.pyplot.html), and [seaborn](https://seaborn.pydata.org/). Let us call it data science light :wink:.
 I decided on a Google spreadsheet to enter the data and add notes or comments as desired; however, I wanted to visualize the data programmatically.
-Reading the data from the spreadsheet, manipulating it, and visualizing it is done inside a [Jupyter Notebook](https://jupyter.org/). A snapshot of the data PASTE LINK is in this GitHub repository.
+Reading the data from the spreadsheet, manipulating it, and visualizing it is done inside a [Jupyter Notebook](https://jupyter.org/). A snapshot of the data is in this [GitHub repository](https://github.com/manderson-it/data-tracking-doggo-edition).
 
 The prerequisites for accessing the spreadsheet from the notebook are covered in the article [Integrate Google Sheets with Jupyter Notebook](https://medium.com/@techno021/integrate-google-sheets-with-jupyter-notebook-e25a4c349828).
 In the Jupyter Notebook, I start by reading, cleaning, and formatting the data from the Google spreadsheet.
