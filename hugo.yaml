@@ -1,0 +1,59 @@
+baseURL: https://manderson-it.ca/
+enableemoji: true
+languageCode: en-us
+pygmentsUseClasses: true
+title: manderson-it blog
+theme: ["PaperMod"]
+
+params:
+  assets:
+    favicon: "/favicon.ico"
+    favicon16x16: "/favicon-16x16.png"
+    favicon32x32: "/favicon-32x32.png"
+    apple_touch_icon: "/apple-touch-icon.png"
+  author: Marek
+  description: "Blog on Cloud Engineering"
+  DateFormat: "January 2, 2006"
+  defaultTheme: auto # dark, light
+  disableThemeToggle: false
+  env: production # to enable google analytics, opengraph, twitter-cards and schema.
+  homeInfoParams:
+    Title: "Welcome :wave:"
+    Content: Welcome to my blog. I am a cloud engineer in Toronto, Canada. Outside of work I enjoy CrossFit, Sci-Fi, and hiking.
+  images: ["<link or path of image for opengraph, twitter-cards>"]
+  keywords: [Blog, Portfolio, PaperMod]
+
+  ShowReadingTime: true
+  ShowShareButtons: true
+  ShareButtons: ["linkedin", "twitter"] # To customize which share buttons to be enabled on page
+  ShowPostNavLinks: true # Adds a Previous / Next post suggestion under a single post
+  ShowBreadCrumbs: true
+  ShowCodeCopyButtons: true # Adds a copy button in code block to copy the code it contains
+  ShowWordCount: true
+  ShowRssButtonInSectionTermList: true
+
+  socialIcons:
+  - name: "github"
+    url: "https://github.com/manderson-it"
+  - name: "linkedin"
+    url: "https://www.linkedin.com/in/marekanderson/"
+  - name: "x"
+    url: "https://x.com/manderson_it"
+
+  title: manderson-it blog
+  UseHugoToc: true
+
+privacy:
+  disqus:
+    disable: true
+  googleAnalytics:
+    disable: true
+  instagram:
+    disable: true
+  twitter:
+    disable: false
+  vimeo:
+    disable: true
+  youtube:
+    disable: true
+
