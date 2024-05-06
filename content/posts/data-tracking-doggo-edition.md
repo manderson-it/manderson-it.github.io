@@ -112,6 +112,7 @@ The chart shows the mean fecal scores per day in lightcoral before beginning the
 Days on the immunosuppressant Atopica are shown in steelblue.
 Followed by days with Prednisone in green.
 While his stool improved, the frequency of vomiting increased to daily during Atopica administration.
+*Update 2024-05-06: A mean fecal score of two (2) is ideal, seven (7) means diarrhea.*
 
 [![Chart](/images/Edison-FecalScoreChart-2023.png)](/images/Edison-FecalScoreChart-2023.png)
 
