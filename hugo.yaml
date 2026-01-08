@@ -3,7 +3,7 @@ enableemoji: true
 languageCode: en-us
 pygmentsUseClasses: true
 title: manderson-it blog
-theme: ["PaperMod"]
+theme: ["hugo-video", "PaperMod"]
 
 params:
   assets:

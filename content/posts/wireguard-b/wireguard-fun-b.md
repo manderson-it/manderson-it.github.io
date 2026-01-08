@@ -1,9 +1,9 @@
 +++
-title = 'An Exploration with Wireguard'
-date = 2026-01-08T08:27:09-05:00
+title = 'B An Exploration with Wireguard'
+date = 2026-01-08T08:55:09-05:00
 draft = true
 +++
-## Introduction
+## Introduction-B
 
 Once upon a time, during my job training, I had to establish site-to-site connectivity for a company. The company has offices in Hamburg and Berlin. Its employees need to access internal services from both offices securely. They need a means to securely connect sites/services over an insecure connection.
 
