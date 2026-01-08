@@ -49,27 +49,27 @@ Assumptions
 
 If you want to explore this setup yourself, I assume:
 
-    Basic Linux experience
-    Basic networking experience
-    Access to Google Cloud
-    No firewall between the GCE instances `hamburg` and `berlin`
-    Run as `root`
+  - Basic Linux experience
+  - Basic networking experience
+  - Access to Google Cloud
+  - No firewall between the GCE instances `hamburg` and `berlin`
+  - Run as `root`
 
 ## My Environment
 
 You need two Google Compute Engine (GCE) instances with no firewall between them. It is for demonstration purposes only.
 
-    Hamburg
-        ens4 : `10.128.0.2`
-        wg0 : `192.168.2.1`
-    Berlin
-        ens4 : `10.128.0.3`
-        wg0 : `192.168.2.2`
-    Config
-        Machine : `e2-small`
-        Region: `us-central1`
-        OS: Ubuntu 25.10 minimal
-        Disk: `10` Gbyte
+  - Hamburg
+    - ens4 : `10.128.0.2`
+    - wg0 : `192.168.2.1`
+  - Berlin
+    - ens4 : `10.128.0.3`
+    - wg0 : `192.168.2.2`
+  - Config
+    - Machine : `e2-small`
+    - Region: `us-central1`
+    - OS: Ubuntu 25.10 minimal
+    - Disk: `10` Gbyte
 
 ## Ubuntu Prerequisites
 
@@ -154,7 +154,7 @@ ip address show dev wg0
     link/none
 ```
 
-Assign an IP address to the `wg0` interface and specify the peer.
+Assign an IP address to the `wg0` interface.
 
   - `Hamburg` will be `192.168.2.1`, and
   - `Berlin` will be `192.168.2.2`.
@@ -201,14 +201,16 @@ To prevent the above error, we change into the wireguard configuration folder.
 cd /etc/wireguard
 umask 077
 wg genkey | tee privatekey | wg pubkey > publickey
+```
 
 Below is an example of the generated key pair.
 
+```shell
 -rw------- 1 root root 45 Jan  6 10:15 privatekey
 -rw------- 1 root root 45 Jan  6 10:15 publickey
 ```
 
-Set the private key for wireguard.
+Use the private key with wireguard.
 
 ```shell
 # wg set - Sets configuration values for the specified <interface>
