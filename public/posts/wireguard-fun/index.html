@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en" dir="auto">
+
+<head><script src="/livereload.js?mindelay=10&amp;v=2&amp;port=1313&amp;path=livereload" data-no-instant defer></script><meta charset="utf-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+<meta name="robots" content="index, follow">
+<title>An Exploration with Wireguard | manderson-it blog</title>
+<meta name="keywords" content="">
+<meta name="description" content="Introduction Once upon a time, during my job training, I had to establish site-to-site connectivity for a company. The company has offices in Hamburg and Berlin. Its employees need to access internal services from both offices securely. They need a means to securely connect sites/services over an insecure connection.
+Enter Virtual Private Network (VPN) tunnels.
+A VPN is an overlay network that connects two or more private networks over a public network.">
+<meta name="author" content="Marek">
+<link rel="canonical" href="http://localhost:1313/posts/wireguard-fun/">
+<link crossorigin="anonymous" href="/assets/css/stylesheet.b609c58d5c11bb90b1a54e04005d74ad1ddf22165eb79f5533967e57df9c3b50.css" integrity="sha256-tgnFjVwRu5CxpU4EAF10rR3fIhZet59VM5Z&#43;V9&#43;cO1A=" rel="preload stylesheet" as="style">
+<link rel="icon" href="http://localhost:1313/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="http://localhost:1313/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="http://localhost:1313/favicon-32x32.png">
+<link rel="apple-touch-icon" href="http://localhost:1313/apple-touch-icon.png">
+<link rel="mask-icon" href="http://localhost:1313/safari-pinned-tab.svg">
+<meta name="theme-color" content="#2e2e33">
+<meta name="msapplication-TileColor" content="#2e2e33">
+<link rel="alternate" hreflang="en" href="http://localhost:1313/posts/wireguard-fun/">
+<noscript>
+    <style>
+        #theme-toggle,
+        .top-link {
+            display: none;
+        }
+
+    </style>
+    <style>
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --theme: rgb(29, 30, 32);
+                --entry: rgb(46, 46, 51);
+                --primary: rgb(218, 218, 219);
+                --secondary: rgb(155, 156, 157);
+                --tertiary: rgb(65, 66, 68);
+                --content: rgb(196, 196, 197);
+                --code-block-bg: rgb(46, 46, 51);
+                --code-bg: rgb(55, 56, 62);
+                --border: rgb(51, 51, 51);
+            }
+
+            .list {
+                background: var(--theme);
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-track {
+                background: 0 0;
+            }
+
+            .list:not(.dark)::-webkit-scrollbar-thumb {
+                border-color: var(--theme);
+            }
+        }
+
+    </style>
+</noscript><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+<link rel="manifest" href="/site.webmanifest">
+<meta property="og:title" content="An Exploration with Wireguard" />
+<meta property="og:description" content="Introduction Once upon a time, during my job training, I had to establish site-to-site connectivity for a company. The company has offices in Hamburg and Berlin. Its employees need to access internal services from both offices securely. They need a means to securely connect sites/services over an insecure connection.
+Enter Virtual Private Network (VPN) tunnels.
+A VPN is an overlay network that connects two or more private networks over a public network." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://localhost:1313/posts/wireguard-fun/" /><meta property="og:image" content="http://localhost:1313/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E"/><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2026-01-05T10:16:17-05:00" />
+<meta property="article:modified_time" content="2026-01-05T10:16:17-05:00" /><meta property="og:site_name" content="manderson-it blog" />
+
+<meta name="twitter:card" content="summary_large_image"/>
+<meta name="twitter:image" content="http://localhost:1313/%3Clink%20or%20path%20of%20image%20for%20opengraph,%20twitter-cards%3E"/>
+
+<meta name="twitter:title" content="An Exploration with Wireguard"/>
+<meta name="twitter:description" content="Introduction Once upon a time, during my job training, I had to establish site-to-site connectivity for a company. The company has offices in Hamburg and Berlin. Its employees need to access internal services from both offices securely. They need a means to securely connect sites/services over an insecure connection.
+Enter Virtual Private Network (VPN) tunnels.
+A VPN is an overlay network that connects two or more private networks over a public network."/>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position":  1 ,
+      "name": "Posts",
+      "item": "http://localhost:1313/posts/"
+    }, 
+    {
+      "@type": "ListItem",
+      "position":  2 ,
+      "name": "An Exploration with Wireguard",
+      "item": "http://localhost:1313/posts/wireguard-fun/"
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "An Exploration with Wireguard",
+  "name": "An Exploration with Wireguard",
+  "description": "Introduction Once upon a time, during my job training, I had to establish site-to-site connectivity for a company. The company has offices in Hamburg and Berlin. Its employees need to access internal services from both offices securely. They need a means to securely connect sites/services over an insecure connection.\nEnter Virtual Private Network (VPN) tunnels.\nA VPN is an overlay network that connects two or more private networks over a public network.",
+  "keywords": [
+    
+  ],
+  "articleBody": "Introduction Once upon a time, during my job training, I had to establish site-to-site connectivity for a company. The company has offices in Hamburg and Berlin. Its employees need to access internal services from both offices securely. They need a means to securely connect sites/services over an insecure connection.\nEnter Virtual Private Network (VPN) tunnels.\nA VPN is an overlay network that connects two or more private networks over a public network. It creates a secure, encrypted “tunnel” between its peers. Back then, many network and security folks advocated for the Internet Protocol Security (IPsec) suite to establish such site-to-site connections. IPsec had been around since 1996 roughly, was trusted by the community, and a prominent implementation under Linux was Strongswan website and Strongswan GitHub. If you are interested in IPsec’s historic Request for Comments (RFCs), which have since been superseded multiple times, see RFC-1825, RFC-1826, and RFC-1827.\nLooking back, the configuration of the IPsec tunnel was rather involved. Depending on your needs, you had to understand and consider some or all of:\nUDP port 500 for the Internet Key Exchange (IKE), IP protocol 50, Encapsulating Security Payload (ESP), for encrypted data, IP Protocol 51, Authentication Header(AH), for data integrity and authentication, UDP port 4500 for Network Address Translation Traversal (NAT-T), and sometimes network appliances may try TCP ports 500 and 4500 as fallback. Ugh, that is a lot! Establishing VPN connectivity between sites was “extra fun” when one site used a Linux server and the other a locked down network appliance with its dialect of IPsec parameters.\nGood times!\nMany years later—Is there an easier way to set up a VPN today?\nAn Exploration with Wireguard Wireguard is a relatively new way (2015) to establish Virtual Private Network (VPN) tunnels, see timeline below of tunneling options/capabilities. I was interested how easy it would be, if at all, to build a VPN tunnel with WireGuard.\nThe WireGuard project puts its goals succinctly as: “WireGuard® is an extremely simple yet fast and modern VPN that utilizes state-of-the-art cryptography. It aims to be faster, simpler, leaner, and more useful than IPsec, while avoiding the massive headache.” Reference: WireGuard start page.\nI will define a simple architecture for our lab environment next.\nArchitecture I will use two Google Compute Engine (GCE) instances representing our two offices in Hamburg and Berlin. There is no firewall between the instances. They will establish VPN connectivity over UDP port 51820.\nThe diagram shows the two GCE instances in GCP.\nNext, I will make some assumptions and then describe and configure my lab environment.\nAssumptions If you want to explore this setup yourself, I assume:\nBasic Linux experience Basic networking experience Access to Google Cloud No firewall between the GCE instances Hamburg and Berlin Run as root My Environment You need two Google Compute Engine (GCE) instances with no firewall between them. It is for demonstration purposes only.\nHamburg ens4 : 10.128.0.2 wg0 : 192.168.2.1 Berlin ens4 : 10.128.0.3 wg0 : 192.168.2.2 Config Machine : e2-small Region: us-central1 OS: Ubuntu 25.10 minimal Disk: 10 Gbyte Ubuntu Prerequisites First, we need to install wireguard and tools. Then, we load the wireguard kernel module.\nInstall Packages Connect to the hamburg GCE instance.\n# replace $MYPROJECT with your actual GCP project or set the variable gcloud compute ssh --zone us-central1-c hamburg --tunnel-through-iap --project $MYPROJECT Stop AppArmor, install the wireguard kernel module, its userspace tools, and ping.\napt update apt install -y iputils-ping wireguard wireguard-tools bash-completion systemctl stop apparmor # ensure bash completion works exit sudo su - 💡 Fun fact: Should you ever wonder what packages you installed after the base operating system (OS), the most effective command might be apt-mark showmanual.\n# Lists user-installed packages including dependencies apt-mark showmanual # Shortened output below [...] iputils-ping wireguard wireguard-tools Load Kernel Module Load the wireguard kernel module.\n# Load the wireguard kernel module modprobe -v wireguard # example output insmod /lib/modules/6.17.0-1005-gcp/kernel/net/ipv4/udp_tunnel.ko.zst insmod /lib/modules/6.17.0-1005-gcp/kernel/net/ipv6/ip6_udp_tunnel.ko.zst insmod /lib/modules/6.17.0-1005-gcp/kernel/lib/crypto/libcurve25519-generic.ko.zst insmod /lib/modules/6.17.0-1005-gcp/kernel/arch/x86/crypto/curve25519-x86_64.ko.zst insmod /lib/modules/6.17.0-1005-gcp/kernel/drivers/net/wireguard/wireguard.ko.zst # Verify with lsmod lsmod | grep wireguard # example output wireguard 118784 0 curve25519_x86_64 36864 1 wireguard libcurve25519_generic 45056 2 curve25519_x86_64,wireguard ip6_udp_tunnel 16384 1 wireguard udp_tunnel 36864 1 wireguard Configure Interfaces and Wireguard Next, we add and configure a network interface for our wireguard tunnel. After that, we will generate the cryptographic keys for wireguard and configure the tunnel between Hamburg and Berlin.\nConfigure Network Interfaces Create a new network interface named wg0 with type wireguard.\n# Add wg0 network interface of type wireguard ip link add dev wg0 type wireguard # Verify ip address show dev wg0 # example output (shortened) 3: wg0: mtu 1420 qdisc noop state DOWN group default qlen 1000 link/none Assign an IP address to the wg0 interface and specify the peer.\nHamburg will be 192.168.2.1, and Berlin will be 192.168.2.2. # Assign IP and peer to wg0 ip address add dev wg0 $WGIP/24 # Verify ip address show dev wg0 # example output (shortened) 3: wg0: mtu 1420 qdisc noop state DOWN group default qlen 1000 link/none inet 192.168.2.1/24 scope global wg0 valid_lft forever preferred_lft forever At this stage, we need cryptographic keys to set up the tunnel.\nSet up Wireguard Tunnel Generate public and private keys for Wireguard. To prevent an error where wireguard cannot read the private key, for example, in your /root/ directory due to AppArmor, we will change our current working directory.\nFYI, here are the errors I experienced while having the key material in my /root/ folder.\nThe command wg set wg0 private-key ./private-key errors with fopen: Permission Denied.\nSimilarly, you can find AppArmor entries in your systemlogs.\n⚠️ Warning: AppArmor may prevent reading the privatekey.\n# inspect logs for AppArmor DENIED entries journalctl | grep -i armor # example AppArmor DENIED entry Dec 23 16:02:01 hamburg kernel: audit: type=1400 audit(1766505721.830:206): apparmor=\"DENIED\" operation=\"open\" class=\"file\" profile=\"wg\" name=\"/root/privatekey\" pid=1206 comm=\"wg\" requested_mask=\"r\" denied_mask=\"r\" fsuid=0 ouid=0 To prevent the above error, we change into the wireguard configuration folder.\ncd /etc/wireguard umask 077 wg genkey | tee privatekey | wg pubkey \u003e publickey Below is an example of the generated key pair.\n-rw------- 1 root root 45 Jan 6 10:15 privatekey -rw------- 1 root root 45 Jan 6 10:15 publickey Set the private key for wireguard.\n# wg set - Sets configuration values for the specified # if listen-port is not provided, it will be chosen at random wg set wg0 private-key /etc/wireguard/privatekey listen-port 51820 Activate the network interface wg0.\n# activate the network interface wg0 ip link set up dev wg0 # Verify ip address show dev wg0 # example output (shortened) 3: wg0: mtu 1420 qdisc noqueue state UNKNOWN group default qlen 1000 link/none inet 192.168.2.1/24 scope global wg0 valid_lft forever preferred_lft forevers View the current wireguard configuration.\n# View wireguard config wg # equivalent to wg show # example output interface: wg0 listening port: 51820 ⚠️ Warning: Repeat the above steps on Berlin before you continue.\nDefine the VPN tunnel on Hamburg. Ensure the port matches the wg output from the peer.\n# On Hamburg # # As arguments, use the public_key, wg0 IP, and ens4 IP from peer-b wg set wg0 peer 9O/Wm3NJeinXGKk5s6sqtOS/rKWf7z45Nc2mFRecKUw= allowed-ips 192.168.2.2 endpoint 10.128.0.3:51820 # View configuration wg # example output interface: wg0 listening port: 51820 peer: 9O/Wm3NJeinXGKk5s6sqtOS/rKWf7z45Nc2mFRecKUw= endpoint: 10.128.0.3:51820 allowed ips: 192.168.2.2/32 Similarly, define the tunnel on Berlin. Ensure the port matches the wg output from the peer.\n# On Berlin # # As arguments, use the public_key, wg0 IP, and ens4 IP from peer-a wg set wg0 peer rXiDojveu4Q6VVIzw2Pm1LFBJLbeWSV6rc/MQqcpWlE= allowed-ips 192.168.2.1 endpoint 10.128.0.2:51820 # View configuration wg # example output interface: wg0 listening port: 51820 peer: rXiDojveu4Q6VVIzw2Pm1LFBJLbeWSV6rc/MQqcpWlE= endpoint: 10.128.0.2:51820 allowed ips: 192.168.2.1/32 Ping the peer through the tunnel to confirm reachability.\n# On hamburg # ping 192.168.2.2 PING 192.168.2.2 (192.168.2.2) 56(84) bytes of data. 64 bytes from 192.168.2.2: icmp_seq=1 ttl=64 time=1.36 ms 64 bytes from 192.168.2.2: icmp_seq=2 ttl=64 time=0.713 ms 64 bytes from 192.168.2.2: icmp_seq=3 ttl=64 time=0.563 ms Finally, inspect the tunnel status with wireguard.\n# show tunnel status with wireguard wg # example output interface: wg0 public key: rXiDojveu4Q6VVIzw2Pm1LFBJLbeWSV6rc/MQqcpWlE= private key: (hidden) listening port: 51820 peer: 9O/Wm3NJeinXGKk5s6sqtOS/rKWf7z45Nc2mFRecKUw= endpoint: 10.128.0.3:51820 allowed ips: 192.168.2.2/32 latest handshake: 1 minute, 35 seconds ago transfer: 1.05 KiB received, 1.23 KiB sent Here is the video of the above setup.\nYour browser does not support the video element. Reflection So Far Well, that was pretty easy and straightforward 😄. I did have to type quite a few commands though.\nCan the commands be streamlined?\nWireGuard Provides The wg-quick tool allows for a quick and easy set up of the tunnel interface.\nSummary Enjoy!\n",
+  "wordCount" : "1425",
+  "inLanguage": "en",
+  "datePublished": "2026-01-05T10:16:17-05:00",
+  "dateModified": "2026-01-05T10:16:17-05:00",
+  "author":{
+    "@type": "Person",
+    "name": "Marek"
+  },
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "http://localhost:1313/posts/wireguard-fun/"
+  },
+  "publisher": {
+    "@type": "Organization",
+    "name": "manderson-it blog",
+    "logo": {
+      "@type": "ImageObject",
+      "url": "http://localhost:1313/favicon.ico"
+    }
+  }
+}
+</script>
+</head>
+
+<body class="" id="top">
+<script>
+    if (localStorage.getItem("pref-theme") === "dark") {
+        document.body.classList.add('dark');
+    } else if (localStorage.getItem("pref-theme") === "light") {
+        document.body.classList.remove('dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.body.classList.add('dark');
+    }
+
+</script>
+
+<header class="header">
+    <nav class="nav">
+        <div class="logo">
+            <a href="http://localhost:1313/" accesskey="h" title="manderson-it blog (Alt + H)">manderson-it blog</a>
+            <div class="logo-switches">
+                <button id="theme-toggle" accesskey="t" title="(Alt + T)">
+                    <svg id="moon" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                    </svg>
+                    <svg id="sun" xmlns="http://www.w3.org/2000/svg" width="24" height="18" viewBox="0 0 24 24"
+                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                </button>
+                <ul class="lang-switch"><li>|</li>
+                </ul>
+            </div>
+        </div>
+        <ul id="menu">
+        </ul>
+    </nav>
+</header>
+<main class="main">
+
+<article class="post-single">
+  <header class="post-header">
+    <div class="breadcrumbs"><a href="http://localhost:1313/">Home</a>&nbsp;»&nbsp;<a href="http://localhost:1313/posts/">Posts</a></div>
+    <h1 class="post-title entry-hint-parent">
+      An Exploration with Wireguard
+      <span class="entry-hint" title="Draft">
+        <svg xmlns="http://www.w3.org/2000/svg" height="35" viewBox="0 -960 960 960" fill="currentColor">
+          <path
+            d="M160-410v-60h300v60H160Zm0-165v-60h470v60H160Zm0-165v-60h470v60H160Zm360 580v-123l221-220q9-9 20-13t22-4q12 0 23 4.5t20 13.5l37 37q9 9 13 20t4 22q0 11-4.5 22.5T862.09-380L643-160H520Zm300-263-37-37 37 37ZM580-220h38l121-122-18-19-19-18-122 121v38Zm141-141-19-18 37 37-18-19Z" />
+        </svg>
+      </span>
+    </h1>
+    <div class="post-meta"><span title='2026-01-05 10:16:17 -0500 EST'>January 5, 2026</span>&nbsp;·&nbsp;7 min&nbsp;·&nbsp;1425 words&nbsp;·&nbsp;Marek
+
+</div>
+  </header> 
+  <div class="post-content"><h2 id="introduction">Introduction<a hidden class="anchor" aria-hidden="true" href="#introduction">#</a></h2>
+<p>Once upon a time, during my job training, I had to establish site-to-site connectivity for a company.
+The company has offices in Hamburg and Berlin. Its employees need to access internal services from both offices securely.
+They need a means to securely connect sites/services over an insecure connection.</p>
+<p>Enter Virtual Private Network (VPN) tunnels.</p>
+<p>A VPN is an overlay network that connects two or more private networks over a public network. It creates a secure, encrypted &ldquo;tunnel&rdquo; between its peers.
+Back then, many network and security folks advocated for the Internet Protocol Security (IPsec) suite to establish such site-to-site connections.
+IPsec had been around since 1996 roughly, was trusted by the community, and a prominent implementation under Linux was <a href="https://strongswan.org/">Strongswan website</a> and <a href="https://github.com/strongswan/strongswan">Strongswan GitHub</a>. If you are interested in IPsec&rsquo;s historic Request for Comments (RFCs), which have since been superseded multiple times, see <a href="https://www.rfc-editor.org/rfc/rfc1825">RFC-1825</a>, <a href="https://www.rfc-editor.org/rfc/rfc1826">RFC-1826</a>, and <a href="https://www.rfc-editor.org/rfc/rfc1827">RFC-1827</a>.</p>
+<p>Looking back, the configuration of the IPsec tunnel was rather involved.
+Depending on your needs, you had to understand and consider some or all of:</p>
+<ul>
+<li>UDP port 500 for the Internet Key Exchange (IKE),</li>
+<li>IP protocol 50, Encapsulating Security Payload (ESP), for encrypted data,</li>
+<li>IP Protocol 51, Authentication Header(AH), for data integrity and authentication,</li>
+<li>UDP port 4500 for Network Address Translation Traversal (NAT-T),</li>
+<li>and sometimes network appliances may try TCP ports 500 and 4500 as fallback.</li>
+</ul>
+<p>Ugh, that is a lot! Establishing VPN connectivity between sites was &ldquo;extra fun&rdquo; when one site used a Linux server and the other a locked down network appliance with its dialect of IPsec parameters.</p>
+<p>Good times!</p>
+<p>Many years later&mdash;Is there an easier way to set up a VPN today?</p>
+<h2 id="an-exploration-with-wireguard">An Exploration with Wireguard<a hidden class="anchor" aria-hidden="true" href="#an-exploration-with-wireguard">#</a></h2>
+<p><a href="https://www.wireguard.com/">Wireguard</a> is a relatively new way (2015) to establish Virtual Private Network (VPN) tunnels, see timeline below of tunneling options/capabilities.
+I was interested how easy it would be, if at all, to build a VPN tunnel with WireGuard.</p>
+<!-- raw HTML omitted -->
+<!-- raw HTML omitted -->
+<p><a href="/images/an-exploration-with-wireguard-timeline.png"><img loading="lazy" src="/images/an-exploration-with-wireguard-timeline.png" alt="History of some VPN tunneling capabilities"  />
+</a></p>
+<p>The WireGuard project puts its goals succinctly as:
+&ldquo;WireGuard® is an extremely simple yet fast and modern VPN that utilizes state-of-the-art cryptography. It aims to be faster, simpler, leaner, and more useful than IPsec, while avoiding the massive headache.&rdquo; Reference: <a href="https://www.wireguard.com/">WireGuard start page</a>.</p>
+<p>I will define a simple architecture for our lab environment next.</p>
+<h2 id="architecture">Architecture<a hidden class="anchor" aria-hidden="true" href="#architecture">#</a></h2>
+<p>I will use two Google Compute Engine (GCE) instances representing our two offices in Hamburg and Berlin.
+There is no firewall between the instances.
+They will establish VPN connectivity over UDP port <code>51820</code>.</p>
+<p>The diagram shows the two GCE instances in GCP.</p>
+<!-- raw HTML omitted -->
+<!-- raw HTML omitted -->
+<p><a href="/images/an-exploration-with-wireguard-architecture.png"><img loading="lazy" src="/images/an-exploration-with-wireguard-architecture.png" alt="Architecture of the Hamburg and Berlin sites in GCP"  />
+</a></p>
+<p>Next, I will make some assumptions and then describe and configure my lab environment.</p>
+<h2 id="assumptions">Assumptions<a hidden class="anchor" aria-hidden="true" href="#assumptions">#</a></h2>
+<p>If you want to explore this setup yourself, I assume:</p>
+<ul>
+<li>Basic Linux experience</li>
+<li>Basic networking experience</li>
+<li>Access to Google Cloud</li>
+<li>No firewall between the GCE instances <code>Hamburg</code> and <code>Berlin</code></li>
+<li>Run as <code>root</code></li>
+</ul>
+<h2 id="my-environment">My Environment<a hidden class="anchor" aria-hidden="true" href="#my-environment">#</a></h2>
+<p>You need two Google Compute Engine (GCE) instances with no firewall between them. It is for demonstration purposes only.</p>
+<ul>
+<li>Hamburg
+<ul>
+<li><code>ens4</code> : <code>10.128.0.2</code></li>
+<li><code>wg0</code>  : <code>192.168.2.1</code></li>
+</ul>
+</li>
+<li>Berlin
+<ul>
+<li><code>ens4</code> : <code>10.128.0.3</code></li>
+<li><code>wg0</code>  : <code>192.168.2.2</code></li>
+</ul>
+</li>
+<li>Config
+<ul>
+<li>Machine : <code>e2-small</code></li>
+<li>Region: <code>us-central1</code></li>
+<li>OS: Ubuntu 25.10 minimal</li>
+<li>Disk: <code>10</code> Gbyte</li>
+</ul>
+</li>
+</ul>
+<h2 id="ubuntu-prerequisites">Ubuntu Prerequisites<a hidden class="anchor" aria-hidden="true" href="#ubuntu-prerequisites">#</a></h2>
+<p>First, we need to install wireguard and tools. Then, we load the wireguard kernel module.</p>
+<h3 id="install-packages">Install Packages<a hidden class="anchor" aria-hidden="true" href="#install-packages">#</a></h3>
+<!-- raw HTML omitted -->
+<!-- raw HTML omitted -->
+<p>Connect to the <code>hamburg</code> GCE instance.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell"><span class="line"><span class="cl"><span class="c1"># replace $MYPROJECT with your actual GCP project or set the variable</span>
+</span></span><span class="line"><span class="cl">gcloud compute ssh --zone us-central1-c hamburg --tunnel-through-iap --project <span class="nv">$MYPROJECT</span>
+</span></span></code></pre></div><p>Stop AppArmor, install the wireguard kernel module, its userspace tools, and ping.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell"><span class="line"><span class="cl">apt update
+</span></span><span class="line"><span class="cl">apt install -y iputils-ping wireguard wireguard-tools bash-completion
+</span></span><span class="line"><span class="cl">systemctl stop apparmor
+</span></span><span class="line"><span class="cl"><span class="c1"># ensure bash completion works</span>
+</span></span><span class="line"><span class="cl"><span class="nb">exit</span>
+</span></span><span class="line"><span class="cl">sudo su -
+</span></span></code></pre></div><blockquote>
+<p>&#x1f4a1; <strong>Fun fact:</strong> Should you ever wonder what packages you installed after the base operating system (OS),
+the most effective command might be <code>apt-mark showmanual</code>.</p>
+</blockquote>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell"><span class="line"><span class="cl"><span class="c1"># Lists user-installed packages including dependencies</span>
+</span></span><span class="line"><span class="cl">apt-mark showmanual
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># Shortened output below </span>
+</span></span><span class="line"><span class="cl"><span class="o">[</span>...<span class="o">]</span>
+</span></span><span class="line"><span class="cl">iputils-ping
+</span></span><span class="line"><span class="cl">wireguard
+</span></span><span class="line"><span class="cl">wireguard-tools
+</span></span></code></pre></div><h3 id="load-kernel-module">Load Kernel Module<a hidden class="anchor" aria-hidden="true" href="#load-kernel-module">#</a></h3>
+<p>Load the wireguard kernel module.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell"><span class="line"><span class="cl"><span class="c1"># Load the wireguard kernel module</span>
+</span></span><span class="line"><span class="cl">modprobe -v wireguard
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># example output</span>
+</span></span><span class="line"><span class="cl">insmod /lib/modules/6.17.0-1005-gcp/kernel/net/ipv4/udp_tunnel.ko.zst
+</span></span><span class="line"><span class="cl">insmod /lib/modules/6.17.0-1005-gcp/kernel/net/ipv6/ip6_udp_tunnel.ko.zst
+</span></span><span class="line"><span class="cl">insmod /lib/modules/6.17.0-1005-gcp/kernel/lib/crypto/libcurve25519-generic.ko.zst
+</span></span><span class="line"><span class="cl">insmod /lib/modules/6.17.0-1005-gcp/kernel/arch/x86/crypto/curve25519-x86_64.ko.zst
+</span></span><span class="line"><span class="cl">insmod /lib/modules/6.17.0-1005-gcp/kernel/drivers/net/wireguard/wireguard.ko.zst
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># Verify with lsmod</span>
+</span></span><span class="line"><span class="cl">lsmod <span class="p">|</span> grep wireguard
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># example output</span>
+</span></span><span class="line"><span class="cl">wireguard             <span class="m">118784</span>  <span class="m">0</span>
+</span></span><span class="line"><span class="cl">curve25519_x86_64      <span class="m">36864</span>  <span class="m">1</span> wireguard
+</span></span><span class="line"><span class="cl">libcurve25519_generic    <span class="m">45056</span>  <span class="m">2</span> curve25519_x86_64,wireguard
+</span></span><span class="line"><span class="cl">ip6_udp_tunnel         <span class="m">16384</span>  <span class="m">1</span> wireguard
+</span></span><span class="line"><span class="cl">udp_tunnel             <span class="m">36864</span>  <span class="m">1</span> wireguard
+</span></span></code></pre></div><h2 id="configure-interfaces-and-wireguard">Configure Interfaces and Wireguard<a hidden class="anchor" aria-hidden="true" href="#configure-interfaces-and-wireguard">#</a></h2>
+<p>Next, we add and configure a network interface for our wireguard tunnel.
+After that, we will generate the cryptographic keys for wireguard and
+configure the tunnel between <code>Hamburg</code> and <code>Berlin</code>.</p>
+<h3 id="configure-network-interfaces">Configure Network Interfaces<a hidden class="anchor" aria-hidden="true" href="#configure-network-interfaces">#</a></h3>
+<p>Create a new network interface named <code>wg0</code> with type <code>wireguard</code>.</p>
+<!-- raw HTML omitted -->
+<!-- raw HTML omitted -->
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell"><span class="line"><span class="cl"><span class="c1"># Add wg0 network interface of type wireguard</span>
+</span></span><span class="line"><span class="cl">ip link add dev wg0 <span class="nb">type</span> wireguard
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># Verify</span>
+</span></span><span class="line"><span class="cl">ip address show dev wg0
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># example output (shortened)</span>
+</span></span><span class="line"><span class="cl">3: wg0: &lt;POINTOPOINT,NOARP&gt; mtu <span class="m">1420</span> qdisc noop state DOWN group default qlen <span class="m">1000</span>
+</span></span><span class="line"><span class="cl">    link/none
+</span></span></code></pre></div><p>Assign an IP address to the <code>wg0</code> interface and specify the peer.</p>
+<ul>
+<li><code>Hamburg</code> will be <code>192.168.2.1</code>, and</li>
+<li><code>Berlin</code> will be <code>192.168.2.2</code>.</li>
+</ul>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell"><span class="line"><span class="cl"><span class="c1"># Assign IP and peer to wg0</span>
+</span></span><span class="line"><span class="cl">ip address add dev wg0 <span class="nv">$WGIP</span>/24
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># Verify</span>
+</span></span><span class="line"><span class="cl">ip address show dev wg0
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># example output (shortened)</span>
+</span></span><span class="line"><span class="cl">3: wg0: &lt;POINTOPOINT,NOARP&gt; mtu <span class="m">1420</span> qdisc noop state DOWN group default qlen <span class="m">1000</span>
+</span></span><span class="line"><span class="cl">    link/none
+</span></span><span class="line"><span class="cl">    inet 192.168.2.1/24 scope global wg0
+</span></span><span class="line"><span class="cl">       valid_lft forever preferred_lft forever
+</span></span></code></pre></div><p>At this stage, we need cryptographic keys to set up the tunnel.</p>
+<h3 id="set-up-wireguard-tunnel">Set up Wireguard Tunnel<a hidden class="anchor" aria-hidden="true" href="#set-up-wireguard-tunnel">#</a></h3>
+<p>Generate public and private keys for Wireguard.
+To prevent an error where wireguard cannot read the private key, for example, in your <code>/root/</code>
+directory due to AppArmor, we will change our current working directory.</p>
+<p>FYI, here are the errors I experienced while having the key material in my <code>/root/</code> folder.</p>
+<p>The command <code>wg set wg0 private-key ./private-key</code> errors with <code>fopen: Permission Denied</code>.</p>
+<p>Similarly, you can find AppArmor entries in your systemlogs.</p>
+<blockquote>
+<p>&#x26a0;&#xfe0f; <strong>Warning:</strong> AppArmor may prevent reading the privatekey.</p>
+</blockquote>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell"><span class="line"><span class="cl"><span class="c1"># inspect logs for AppArmor DENIED entries</span>
+</span></span><span class="line"><span class="cl">journalctl <span class="p">|</span> grep -i armor
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># example AppArmor DENIED entry</span>
+</span></span><span class="line"><span class="cl">Dec <span class="m">23</span> 16:02:01 hamburg kernel: audit: <span class="nv">type</span><span class="o">=</span><span class="m">1400</span> audit<span class="o">(</span>1766505721.830:206<span class="o">)</span>: <span class="nv">apparmor</span><span class="o">=</span><span class="s2">&#34;DENIED&#34;</span> <span class="nv">operation</span><span class="o">=</span><span class="s2">&#34;open&#34;</span> <span class="nv">class</span><span class="o">=</span><span class="s2">&#34;file&#34;</span> <span class="nv">profile</span><span class="o">=</span><span class="s2">&#34;wg&#34;</span> <span class="nv">name</span><span class="o">=</span><span class="s2">&#34;/root/privatekey&#34;</span> <span class="nv">pid</span><span class="o">=</span><span class="m">1206</span> <span class="nv">comm</span><span class="o">=</span><span class="s2">&#34;wg&#34;</span> <span class="nv">requested_mask</span><span class="o">=</span><span class="s2">&#34;r&#34;</span> <span class="nv">denied_mask</span><span class="o">=</span><span class="s2">&#34;r&#34;</span> <span class="nv">fsuid</span><span class="o">=</span><span class="m">0</span> <span class="nv">ouid</span><span class="o">=</span><span class="m">0</span>
+</span></span></code></pre></div><p>To prevent the above error, we change into the wireguard configuration folder.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell"><span class="line"><span class="cl"><span class="nb">cd</span> /etc/wireguard
+</span></span><span class="line"><span class="cl"><span class="nb">umask</span> <span class="m">077</span>
+</span></span><span class="line"><span class="cl">wg genkey <span class="p">|</span> tee privatekey <span class="p">|</span> wg pubkey &gt; publickey
+</span></span></code></pre></div><p>Below is an example of the generated key pair.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell"><span class="line"><span class="cl">-rw------- <span class="m">1</span> root root <span class="m">45</span> Jan  <span class="m">6</span> 10:15 privatekey
+</span></span><span class="line"><span class="cl">-rw------- <span class="m">1</span> root root <span class="m">45</span> Jan  <span class="m">6</span> 10:15 publickey
+</span></span></code></pre></div><p>Set the private key for wireguard.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell"><span class="line"><span class="cl"><span class="c1"># wg set - Sets configuration values for the specified &lt;interface&gt;</span>
+</span></span><span class="line"><span class="cl"><span class="c1"># if listen-port is not provided, it will be chosen at random</span>
+</span></span><span class="line"><span class="cl">wg <span class="nb">set</span> wg0 private-key /etc/wireguard/privatekey listen-port <span class="m">51820</span>
+</span></span></code></pre></div><p>Activate the network interface <code>wg0</code>.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell"><span class="line"><span class="cl"><span class="c1"># activate the network interface wg0</span>
+</span></span><span class="line"><span class="cl">ip link <span class="nb">set</span> up dev wg0
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># Verify</span>
+</span></span><span class="line"><span class="cl">ip address show dev wg0
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># example output (shortened)</span>
+</span></span><span class="line"><span class="cl">3: wg0: &lt;POINTOPOINT,NOARP,UP,LOWER_UP&gt; mtu <span class="m">1420</span> qdisc noqueue state UNKNOWN group default qlen <span class="m">1000</span>
+</span></span><span class="line"><span class="cl">    link/none
+</span></span><span class="line"><span class="cl">    inet 192.168.2.1/24 scope global wg0
+</span></span><span class="line"><span class="cl">       valid_lft forever preferred_lft forevers
+</span></span></code></pre></div><p>View the current wireguard configuration.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell"><span class="line"><span class="cl"><span class="c1"># View wireguard config</span>
+</span></span><span class="line"><span class="cl">wg
+</span></span><span class="line"><span class="cl"><span class="c1"># equivalent to</span>
+</span></span><span class="line"><span class="cl">wg show
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># example output</span>
+</span></span><span class="line"><span class="cl">interface: wg0
+</span></span><span class="line"><span class="cl">  listening port: <span class="m">51820</span>
+</span></span></code></pre></div><blockquote>
+<p>&#x26a0;&#xfe0f; <strong>Warning:</strong> Repeat the above steps on <code>Berlin</code> before you continue.</p>
+</blockquote>
+<p>Define the VPN tunnel on <code>Hamburg</code>. Ensure the port matches the <code>wg</code> output from the peer.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell"><span class="line"><span class="cl"><span class="c1"># On Hamburg</span>
+</span></span><span class="line"><span class="cl"><span class="c1">#</span>
+</span></span><span class="line"><span class="cl"><span class="c1"># As arguments, use the public_key, wg0 IP, and ens4 IP from peer-b</span>
+</span></span><span class="line"><span class="cl">wg <span class="nb">set</span> wg0 peer 9O/Wm3NJeinXGKk5s6sqtOS/rKWf7z45Nc2mFRecKUw<span class="o">=</span> allowed-ips 192.168.2.2 endpoint 10.128.0.3:51820
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># View configuration</span>
+</span></span><span class="line"><span class="cl">wg
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># example output</span>
+</span></span><span class="line"><span class="cl">interface: wg0
+</span></span><span class="line"><span class="cl">  listening port: <span class="m">51820</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">peer: 9O/Wm3NJeinXGKk5s6sqtOS/rKWf7z45Nc2mFRecKUw<span class="o">=</span>
+</span></span><span class="line"><span class="cl">  endpoint: 10.128.0.3:51820
+</span></span><span class="line"><span class="cl">  allowed ips: 192.168.2.2/32
+</span></span></code></pre></div><p>Similarly, define the tunnel on <code>Berlin</code>. Ensure the port matches the <code>wg</code> output from the peer.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell"><span class="line"><span class="cl"><span class="c1"># On Berlin</span>
+</span></span><span class="line"><span class="cl"><span class="c1">#</span>
+</span></span><span class="line"><span class="cl"><span class="c1"># As arguments, use the public_key, wg0 IP, and ens4 IP from peer-a</span>
+</span></span><span class="line"><span class="cl">wg <span class="nb">set</span> wg0 peer rXiDojveu4Q6VVIzw2Pm1LFBJLbeWSV6rc/MQqcpWlE<span class="o">=</span> allowed-ips 192.168.2.1 endpoint 10.128.0.2:51820
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># View configuration</span>
+</span></span><span class="line"><span class="cl">wg
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># example output</span>
+</span></span><span class="line"><span class="cl">interface: wg0
+</span></span><span class="line"><span class="cl">  listening port: <span class="m">51820</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">peer: rXiDojveu4Q6VVIzw2Pm1LFBJLbeWSV6rc/MQqcpWlE<span class="o">=</span>
+</span></span><span class="line"><span class="cl">  endpoint: 10.128.0.2:51820
+</span></span><span class="line"><span class="cl">  allowed ips: 192.168.2.1/32
+</span></span></code></pre></div><p>Ping the peer through the tunnel to confirm reachability.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell"><span class="line"><span class="cl"><span class="c1"># On hamburg</span>
+</span></span><span class="line"><span class="cl"><span class="c1">#</span>
+</span></span><span class="line"><span class="cl">ping 192.168.2.2
+</span></span><span class="line"><span class="cl">PING 192.168.2.2 <span class="o">(</span>192.168.2.2<span class="o">)</span> 56<span class="o">(</span>84<span class="o">)</span> bytes of data.
+</span></span><span class="line"><span class="cl"><span class="m">64</span> bytes from 192.168.2.2: <span class="nv">icmp_seq</span><span class="o">=</span><span class="m">1</span> <span class="nv">ttl</span><span class="o">=</span><span class="m">64</span> <span class="nv">time</span><span class="o">=</span>1.36 ms
+</span></span><span class="line"><span class="cl"><span class="m">64</span> bytes from 192.168.2.2: <span class="nv">icmp_seq</span><span class="o">=</span><span class="m">2</span> <span class="nv">ttl</span><span class="o">=</span><span class="m">64</span> <span class="nv">time</span><span class="o">=</span>0.713 ms
+</span></span><span class="line"><span class="cl"><span class="m">64</span> bytes from 192.168.2.2: <span class="nv">icmp_seq</span><span class="o">=</span><span class="m">3</span> <span class="nv">ttl</span><span class="o">=</span><span class="m">64</span> <span class="nv">time</span><span class="o">=</span>0.563 ms
+</span></span></code></pre></div><p>Finally, inspect the tunnel status with wireguard.</p>
+<div class="highlight"><pre tabindex="0" class="chroma"><code class="language-shell" data-lang="shell"><span class="line"><span class="cl"><span class="c1"># show tunnel status with wireguard</span>
+</span></span><span class="line"><span class="cl">wg
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl"><span class="c1"># example output</span>
+</span></span><span class="line"><span class="cl">interface: wg0
+</span></span><span class="line"><span class="cl">  public key: rXiDojveu4Q6VVIzw2Pm1LFBJLbeWSV6rc/MQqcpWlE<span class="o">=</span>
+</span></span><span class="line"><span class="cl">  private key: <span class="o">(</span>hidden<span class="o">)</span>
+</span></span><span class="line"><span class="cl">  listening port: <span class="m">51820</span>
+</span></span><span class="line"><span class="cl">
+</span></span><span class="line"><span class="cl">peer: 9O/Wm3NJeinXGKk5s6sqtOS/rKWf7z45Nc2mFRecKUw<span class="o">=</span>
+</span></span><span class="line"><span class="cl">  endpoint: 10.128.0.3:51820
+</span></span><span class="line"><span class="cl">  allowed ips: 192.168.2.2/32
+</span></span><span class="line"><span class="cl">  latest handshake: <span class="m">1</span> minute, <span class="m">35</span> seconds ago
+</span></span><span class="line"><span class="cl">  transfer: 1.05 KiB received, 1.23 KiB sent
+</span></span></code></pre></div><p>Here is the video of the above setup.</p>
+<video width="600" preload="metadata" controls>
+    <source src="wireguard.webm" type="video/webm">
+    Your browser does not support the video element.
+</video>
+
+<h2 id="reflection-so-far">Reflection So Far<a hidden class="anchor" aria-hidden="true" href="#reflection-so-far">#</a></h2>
+<p>Well, that was pretty easy and straightforward &#x1f604;.
+I did have to type quite a few commands though.</p>
+<p>Can the commands be streamlined?</p>
+<h2 id="wireguard-provides">WireGuard Provides<a hidden class="anchor" aria-hidden="true" href="#wireguard-provides">#</a></h2>
+<p>The <code>wg-quick</code> tool allows for a quick and easy set up of the tunnel interface.</p>
+<h2 id="summary">Summary<a hidden class="anchor" aria-hidden="true" href="#summary">#</a></h2>
+<p>Enjoy!</p>
+
+
+  </div>
+
+  <footer class="post-footer">
+    <ul class="post-tags">
+    </ul>
+<nav class="paginav">
+  <a class="next" href="http://localhost:1313/posts/data-tracking-doggo-edition/">
+    <span class="title">Next »</span>
+    <br>
+    <span>Data Tracking Doggo Edition</span>
+  </a>
+</nav>
+
+
+<ul class="share-buttons">
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share An Exploration with Wireguard on x"
+            href="https://x.com/intent/tweet/?text=An%20Exploration%20with%20Wireguard&amp;url=http%3a%2f%2flocalhost%3a1313%2fposts%2fwireguard-fun%2f&amp;hashtags=">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M512 62.554 L 512 449.446 C 512 483.97 483.97 512 449.446 512 L 62.554 512 C 28.03 512 0 483.97 0 449.446 L 0 62.554 C 0 28.03 28.029 0 62.554 0 L 449.446 0 C 483.971 0 512 28.03 512 62.554 Z M 269.951 190.75 L 182.567 75.216 L 56 75.216 L 207.216 272.95 L 63.9 436.783 L 125.266 436.783 L 235.9 310.383 L 332.567 436.783 L 456 436.783 L 298.367 228.367 L 432.367 75.216 L 371.033 75.216 Z M 127.633 110 L 164.101 110 L 383.481 400.065 L 349.5 400.065 Z" />
+            </svg>
+        </a>
+    </li>
+    <li>
+        <a target="_blank" rel="noopener noreferrer" aria-label="share An Exploration with Wireguard on linkedin"
+            href="https://www.linkedin.com/shareArticle?mini=true&amp;url=http%3a%2f%2flocalhost%3a1313%2fposts%2fwireguard-fun%2f&amp;title=An%20Exploration%20with%20Wireguard&amp;summary=An%20Exploration%20with%20Wireguard&amp;source=http%3a%2f%2flocalhost%3a1313%2fposts%2fwireguard-fun%2f">
+            <svg version="1.1" viewBox="0 0 512 512" xml:space="preserve" height="30px" width="30px" fill="currentColor">
+                <path
+                    d="M449.446,0c34.525,0 62.554,28.03 62.554,62.554l0,386.892c0,34.524 -28.03,62.554 -62.554,62.554l-386.892,0c-34.524,0 -62.554,-28.03 -62.554,-62.554l0,-386.892c0,-34.524 28.029,-62.554 62.554,-62.554l386.892,0Zm-288.985,423.278l0,-225.717l-75.04,0l0,225.717l75.04,0Zm270.539,0l0,-129.439c0,-69.333 -37.018,-101.586 -86.381,-101.586c-39.804,0 -57.634,21.891 -67.617,37.266l0,-31.958l-75.021,0c0.995,21.181 0,225.717 0,225.717l75.02,0l0,-126.056c0,-6.748 0.486,-13.492 2.474,-18.315c5.414,-13.475 17.767,-27.434 38.494,-27.434c27.135,0 38.007,20.707 38.007,51.037l0,120.768l75.024,0Zm-307.552,-334.556c-25.674,0 -42.448,16.879 -42.448,39.002c0,21.658 16.264,39.002 41.455,39.002l0.484,0c26.165,0 42.452,-17.344 42.452,-39.002c-0.485,-22.092 -16.241,-38.954 -41.943,-39.002Z" />
+            </svg>
+        </a>
+    </li>
+</ul>
+
+  </footer>
+</article>
+    </main>
+    
+<footer class="footer">
+    <span>&copy; 2026 <a href="http://localhost:1313/">manderson-it blog</a></span>
+    <span>
+        Powered by
+        <a href="https://gohugo.io/" rel="noopener noreferrer" target="_blank">Hugo</a> &
+        <a href="https://github.com/adityatelange/hugo-PaperMod/" rel="noopener" target="_blank">PaperMod</a>
+    </span>
+</footer>
+<a href="#top" aria-label="go to top" title="Go to Top (Alt + G)" class="top-link" id="top-link" accesskey="g">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12 6" fill="currentColor">
+        <path d="M12 6H0l6-6z" />
+    </svg>
+</a>
+
+<script>
+    let menu = document.getElementById('menu')
+    if (menu) {
+        menu.scrollLeft = localStorage.getItem("menu-scroll-position");
+        menu.onscroll = function () {
+            localStorage.setItem("menu-scroll-position", menu.scrollLeft);
+        }
+    }
+
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        anchor.addEventListener("click", function (e) {
+            e.preventDefault();
+            var id = this.getAttribute("href").substr(1);
+            if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView({
+                    behavior: "smooth"
+                });
+            } else {
+                document.querySelector(`[id='${decodeURIComponent(id)}']`).scrollIntoView();
+            }
+            if (id === "top") {
+                history.replaceState(null, null, " ");
+            } else {
+                history.pushState(null, null, `#${id}`);
+            }
+        });
+    });
+
+</script>
+<script>
+    var mybutton = document.getElementById("top-link");
+    window.onscroll = function () {
+        if (document.body.scrollTop > 800 || document.documentElement.scrollTop > 800) {
+            mybutton.style.visibility = "visible";
+            mybutton.style.opacity = "1";
+        } else {
+            mybutton.style.visibility = "hidden";
+            mybutton.style.opacity = "0";
+        }
+    };
+
+</script>
+<script>
+    document.getElementById("theme-toggle").addEventListener("click", () => {
+        if (document.body.className.includes("dark")) {
+            document.body.classList.remove('dark');
+            localStorage.setItem("pref-theme", 'light');
+        } else {
+            document.body.classList.add('dark');
+            localStorage.setItem("pref-theme", 'dark');
+        }
+    })
+
+</script>
+<script>
+    document.querySelectorAll('pre > code').forEach((codeblock) => {
+        const container = codeblock.parentNode.parentNode;
+
+        const copybutton = document.createElement('button');
+        copybutton.classList.add('copy-code');
+        copybutton.innerHTML = 'copy';
+
+        function copyingDone() {
+            copybutton.innerHTML = 'copied!';
+            setTimeout(() => {
+                copybutton.innerHTML = 'copy';
+            }, 2000);
+        }
+
+        copybutton.addEventListener('click', (cb) => {
+            if ('clipboard' in navigator) {
+                navigator.clipboard.writeText(codeblock.textContent);
+                copyingDone();
+                return;
+            }
+
+            const range = document.createRange();
+            range.selectNodeContents(codeblock);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            try {
+                document.execCommand('copy');
+                copyingDone();
+            } catch (e) { };
+            selection.removeRange(range);
+        });
+
+        if (container.classList.contains("highlight")) {
+            container.appendChild(copybutton);
+        } else if (container.parentNode.firstChild == container) {
+            
+        } else if (codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.nodeName == "TABLE") {
+            
+            codeblock.parentNode.parentNode.parentNode.parentNode.parentNode.appendChild(copybutton);
+        } else {
+            
+            codeblock.parentNode.appendChild(copybutton);
+        }
+    });
+</script>
+</body>
+
+</html>
