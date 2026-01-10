@@ -1,6 +1,6 @@
 +++
 title = 'An Exploration with Wireguard'
-date = 2026-01-08T08:27:09-05:00
+date = 2026-01-08T08:55:09-05:00
 draft = true
 +++
 ## Introduction
@@ -29,6 +29,26 @@ Many years later---Is there an easier way to set up a VPN today?
 
 [Wireguard](https://www.wireguard.com/) is a relatively new way (2015) to establish Virtual Private Network (VPN) tunnels, see timeline below of tunneling options/capabilities. I was interested how easy it would be, if at all, to build a VPN tunnel with WireGuard.
 
+{{< rawhtml >}}
+<!--
+mermaid.js
+```js
+---
+config:
+  themeVariables:
+   fontSize: 20px
+---
+timeline
+    title History of some VPN tunneling capabilities
+    1996 : IPsec
+    1999 : TLS/SSL
+         : OpenSSH
+    2001 : OpenVPN
+    2007 : SSTP
+    2015 : WireGuard
+-->
+{{< /rawhtml >}}
+
 [![History of some VPN tunneling capabilities](/images/an-exploration-with-wireguard-timeline.png)](/images/an-exploration-with-wireguard-timeline.png)
 
 
@@ -43,6 +63,29 @@ I will use two Google Compute Engine (GCE) instances representing our two office
 The diagram shows the two GCE instances in GCP.
 
 [![Architecture of the Hamburg and Berlin sites in GCP](/images/an-exploration-with-wireguard-architecture.png)](/images/an-exploration-with-wireguard-architecture.png)
+
+
+{{< rawhtml >}}
+<!--
+mermaid.js
+```js
+---
+config:
+  themeVariables:
+   fontSize: 20px
+---
+architecture-beta
+    group gcp(cloud)[Google Cloud Project]
+    group vpc(cloud)[VPC] in gcp
+    group reg(cloud)[Region] in vpc
+
+    service peer-a(server)[Hamburg] in reg
+    service peer-b(server)[Berlin] in reg
+
+    peer-a:L -- R:peer-b
+```
+-->
+{{< /rawhtml >}}
 
 Next, I will make some assumptions and then describe and configure my lab environment.
 Assumptions
@@ -320,21 +363,99 @@ peer: 9O/Wm3NJeinXGKk5s6sqtOS/rKWf7z45Nc2mFRecKUw=
   transfer: 1.05 KiB received, 1.23 KiB sent
 ```
 
-Here is the video of the above setup.
+Here is the video of the steps above.
+It starts after we ran these commands:
+
+```shell
+apt update
+apt install -y iputils-ping wireguard wireguard-tools bash-completion
+systemctl stop apparmor
+# ensure bash completion works
+exit
+sudo su -
+```
+
+Video:
 
 {{< video src="wireguard-fun" >}}
 
 ## Reflection So Far
 
-Well, that was pretty easy and straightforward 😄. I did have to type quite a few commands though.
+Well, that was pretty easy and straightforward 😄.
 
-Can the commands be streamlined?
+We did have to type quite a few commands though. Here is a summary of the WireGuard-related steps.
+We used:
+
+- three `ip` commands to bring up the network interface, and
+- three `wg` commands to configure WireGuard
+
+```shell
+# summary of WireGuard-related commands
+modprobe -v wireguard
+ip link add dev wg0 type wireguard
+ip address add dev wg0 $WGIP/24
+cd /etc/wireguard
+umask 077
+wg genkey | tee privatekey | wg pubkey > publickey
+wg set wg0 private-key /etc/wireguard/privatekey listen-port 51820
+ip link set up dev wg0
+wg set wg0 peer 9O/Wm3NJeinXGKk5s6sqtOS/rKWf7z45Nc2mFRecKUw= allowed-ips 192.168.2.2 endpoint 10.128.0.3:51820
+```
+
+Can the commands be streamlined after our one-time setup?
 
 ## WireGuard Provides
 
-The `wg-quick` tool allows for a quick and easy set up of the tunnel interface.
+It is quick and easy setting up the tunnel interface with `wg-quick`.
+Now, that we have our configuration, we can save it to a file.
+That way, we can quickly bring up the tunnel with a single command.
+
+```shell
+# save current wg configuration to a file
+cd /etc/wireguard
+touch wg0.conf
+wg-quick save wg0
+```
+
+The `wg-quick` tool allows us to quickly bring our interface `wg0` up/down.
+You can explore this with the following commands.
+
+```shell
+# bring the interface down
+wg-quick down wg0
+# example output
+[#] ip link delete dev wg0
+
+# verify
+ip addr show wg0
+
+# bring it up
+wg-quick up wg0
+# example output
+[#] ip link add wg0 type wireguard
+[#] wg setconf wg0 /dev/fd/63
+[#] ip -4 address add 192.168.2.1/24 dev wg0
+[#] ip link set mtu 1380 up dev wg0
+
+# verify
+ip addr show wg0
+wg show
+```
+
+Neat! :star_struck:
+
+And, if you want to add it as a systemd service:
+
+```shell
+sudo systemctl enable wg-quick@wg0.service
+sudo systemctl daemon-reload
+```
+
+Cool, cool, cool! :nerd_face:
 
 ## Summary
 
-Enjoy!
+WireGuard delivers what it promises.
+It is a fantastic way to create a secure VPN tunnel these days!
 
+If you are interested how WireGuard's performance compares to IPsec and OpenVPN, check [this](https://www.wireguard.com/performance/) out.
