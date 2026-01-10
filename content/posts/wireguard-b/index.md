@@ -1,7 +1,7 @@
 +++
 title = 'An Exploration with Wireguard'
-date = 2026-01-08T08:55:09-05:00
-draft = true
+date = 2026-01-10T08:55:09-05:00
+draft = false
 +++
 ## Introduction
 
