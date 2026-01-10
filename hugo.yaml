@@ -19,7 +19,7 @@ params:
   env: production # to enable google analytics, opengraph, twitter-cards and schema.
   homeInfoParams:
     Title: "Welcome :wave:"
-    Content: Welcome to my blog. I am a cloud engineer in Toronto, Canada. Outside of work I enjoy CrossFit, Sci-Fi, and hiking.
+    Content: Welcome to my blog. I am a cloud engineer in Toronto, Canada. Outside of work I enjoy CrossFit, Weightlifting, Sci-Fi, and hiking.
   images: ["<link or path of image for opengraph, twitter-cards>"]
   keywords: [Blog, Portfolio, PaperMod]
 
