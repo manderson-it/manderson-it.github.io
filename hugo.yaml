@@ -37,8 +37,6 @@ params:
     url: "https://github.com/manderson-it"
   - name: "linkedin"
     url: "https://www.linkedin.com/in/marekanderson/"
-  - name: "x"
-    url: "https://x.com/manderson_it"
 
   title: manderson-it blog
   UseHugoToc: true
@@ -51,7 +49,7 @@ privacy:
   instagram:
     disable: true
   twitter:
-    disable: false
+    disable: true
   vimeo:
     disable: true
   youtube:

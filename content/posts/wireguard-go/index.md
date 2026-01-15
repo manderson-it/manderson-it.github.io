@@ -1,35 +1,17 @@
 +++
 title = 'WireGuard in Userspace'
-date = 2026-01-12T11:02:09-05:00
-draft = true
+date = 2026-01-15T13:36:09-05:00
+draft = false
 +++
 ## WireGuard Continued
 
-In the [previous article](https://manderson-it.ca/posts/wireguard-fun/), we set up a VPN tunnel with WireGuard between two sites.
+In the [previous article](https://manderson-it.ca/posts/wireguard-fun/), we set up a VPN tunnel with the WireGuard kernel module between two sites.
 
-{{< rawhtml >}}
-<!--
-https://www.youtube.com/watch?v=NFRUN5FwhY0
--->
-{{< /rawhtml >}}
+Here, we will create:
 
-Here, we apply a userspace implementation of WireGuard, set up our VPN server, and connect from an iPhone.
-Why would one want to use a userspace implementation though?
-
-Generally, we want to use WireGuard as a kernel module for best raw performance.
-The kernel module will be available in a lot of cases.
-You may find yourself working with a system that doesn't offer kernel module support.
-This could apply to: older or locked-down OSes, some BSD variants, minimal containers or unikernels, or embedded systems.
-Similarly, you may need WireGuard as a library if you want to embed it inside an application, you need programmatic control over tunnels, or build a custom vpn client.
-In other words, if you are working in a restricted environment, or flexibility and portability are more important, running WireGuard as a userspace process can be a good choice.
-
-Let us choose the well established Golang implementation, called wireguard-go.
-Its [git repository is here](https://git.zx2c4.com/wireguard-go), and some
-[explanation around userspace implementation is on the project site](https://www.wireguard.com/xplatform/).
-
-What we will build is as straightforward as the diagram below.
-We will create the VPN server, generate a QR code for our client configuration, and scan the QR code
-on an iPhone to establish the VPN connection.
+- the VPN server and let is act as a DNS resolver for our VPN client,
+- generate a QR code for our client configuration, and
+- scan the QR code on an iPhone to establish the VPN connection.
 
 {{< rawhtml >}}
 <!--
@@ -43,54 +25,151 @@ markdownAutoWrap: true
 ---
 graph LR;
     subgraph "fa:fa-house elsewhere"
-      BA([fa:fa-phone iPhone])
-      QR\-\->|fa:fa-camera|BA
+      IPHONE([fa:fa-phone iPhone])
+      QR-\->|fa:fa-camera|IPHONE
       QR([fa:fa-qrcode QR code])
     end
     subgraph "fab:fa-google GCP"
-      CB([fab:fa-fort-awesome-alt WireGuard server])
+      WG([fab:fa-fort-awesome-alt WireGuard server])
     end
-    BA -\-\->|fas:fa-cloud tunnel| CB
+    IPHONE -\-\->|fas:fa-cloud tunnel| WG
+
+graph LR;
+    subgraph "fa:fa-house elsewhere"
+      IPHONE([fa:fa-phone iPhone])
+      QR-\->|fa:fa-camera|IPHONE
+      QR([fa:fa-qrcode QR code])
+    end
+    subgraph "fab:fa-google GCP"
+      WG([fab:fa-fort-awesome-alt WireGuard server])
+      ROUTER([fa:fa-route Router])
+      NAT([fa:fa-network-wired NAT])
+      WG-\->ROUTER
+      ROUTER-\->NAT
+    end
+    IPHONE -\-\->|fas:fa-cloud tunnel| WG
+    INET([fas:fa-cloud Internet])
+    NAT -\-\-> INET
 -->
 {{< /rawhtml >}}
 
 [![Architecture of the Hamburg and Berlin sites in GCP](/images/wireguard-go-arch.png)](/images/wireguard-go-arch.png)
 
-## My Environment
+Last time, we used the WireGuard kernel module. Let's use a userspace implementation.
+Why would one want to use a userspace implementation though?
 
-You need two Google Compute Engine (GCE) instances with no firewall between them. It is for demonstration purposes only.
+Generally, we want to use WireGuard as a kernel module for best raw performance.
+The kernel module will be available in a lot of cases.
+However, you may find yourself working with a system that doesn't offer kernel module support.
+This could apply to: older or locked-down OSes, some BSD variants, minimal containers or unikernels, or embedded systems.
+Similarly, you may need WireGuard as a library if you want to embed it inside an application, you need programmatic control over tunnels, or build a custom vpn client.
+In other words, if you are working in a restricted environment, or flexibility and portability are more important, running WireGuard as a userspace process can be a good choice.
 
-  - WireGuard Server
-    - ens4 : `10.128.0.2`
-    - wg0 : `192.168.2.1`
-  - iPhone
-    - iOS Version `18.7.2`
-    - [WireGuard app](https://apps.apple.com/ca/app/wireguard/id1441195209) `1.0.16`
-  - Config
-    - Machine : `e2-small`
-    - Region: `us-central1`
-    - OS: Ubuntu 25.10 minimal
-    - Disk: `10` Gbyte
-    - VPC Firewall rule
-      ```shell
-      gcloud compute --project=$MYPROJECT \
-      firewall-rules create allow-wg \
-      --direction=INGRESS --priority=1000 --network=default --action=ALLOW \
-      --rules=udp:51820 --source-ranges=0.0.0.0/0
-      ```
-    - Cloud Router
-      ```shell
-      gcloud compute routers create my-cloud-router \
-      --network=default \
-      --asn=65000
-      ```
-    - Cloud NAT
-      ```shell
-      gcloud compute routers nats create my-nat \
-      --router=my-cloud-router \
-      --auto-allocate-nat-external-ips \
-      --nat-all-subnet-ip-ranges
-      ```
+Let us choose the well established Golang implementation, called [wireguard-go](https://git.zx2c4.com/wireguard-go).
+If you are interested in the conventions for WireGuard userspace implementations,
+[take a look here](https://www.wireguard.com/xplatform/).
+
+## Our Environment
+
+:warning: It is for demonstration purposes only.
+
+You need a Google Compute Engine (GCE) instance with a public IP address. 
+We streamline the instance configuration by providing an instance startup script.
+It installs packages, disables AppArmor, and enables IP forwarding at the OS-level.
+
+### WireGuard Server
+
+A minimal overview of what we run on our VPN server.
+
+- name : `wg-server`
+- ens4 : `10.188.0.2` (or similar)
+- wg0 : `172.16.42.1`
+- Port: `51820` UDP
+- [Caddy](https://caddyserver.com) (webserver) - to verify iPhone connectivity
+- [Unbound](https://nlnetlabs.nl/projects/unbound/about/) (DNS resolver) - used by the iPhone 
+
+### iPhone
+
+- IP assigned from WireGuard server: `172.16.42.42`
+- iOS Version tested `18.7.2`
+- [WireGuard app](https://apps.apple.com/ca/app/wireguard/id1441195209) `1.0.16`
+
+### Create GCE resources
+
+We will create a startup script for our GCE instance, the GCE instance, and a firewall rule
+to allow incoming UDP traffic on port `51820` to the instance.
+
+#### GCE startup script
+
+Create the startup script `wg-server-startup-script.sh` where you will run `gcloud compute instances create`.
+
+```shell
+#!/usr/bin/env bash
+# WireGuard Server Startup Script
+apt update
+apt install -y \
+  wireguard-go wireguard-tools qrencode unbound caddy apparmor-utils \
+  iputils-ping net-tools iptables \
+  bash-completion vim tmux
+aa-disable /etc/apparmor.d/usr.sbin.unbound
+systemctl stop apparmor
+systemctl disable apparmor
+sysctl -w net.ipv4.ip_forward=1
+echo "net.ipv4.ip_forward=1" | tee -a /etc/sysctl.conf
+sed -i 's/ip_forward=0/ip_forward=1/' /etc/sysctl.d/60-gce-network-security.conf
+wireguard-go wg0
+systemctl enable wg-quick@wg0.service
+systemctl daemon-reload
+```
+
+#### GCE Instance Config
+
+- Machine : `e2-small`
+- Region: `northamerica-northeast2`
+- OS: Ubuntu 25.10 minimal
+- Disk: `10` Gbyte
+- Cloud API access scopes: `cloud-platform`
+```shell
+gcloud compute instances create \
+--machine-type=e2-small \
+--image-family=ubuntu-minimal-2510-amd64 \
+--image-project=ubuntu-os-cloud \
+--scopes=cloud-platform \
+--can-ip-forward \
+--tags=vpn-server \
+--metadata-from-file=startup-script=./wg-server-startup-script.sh \
+--async \
+wg-server
+```
+
+#### GCP VPC Firewall rule
+
+The firewall rule allows UDP traffic to our port `51820` to our `wg-server`
+GCE instance tagged with `vpn-server`.
+
+```shell
+gcloud compute --project=$CLOUDSDK_CORE_PROJECT \
+firewall-rules create allow-wg \
+--direction=INGRESS --priority=1000 --network=default --action=ALLOW \
+--rules=udp:51820 --source-ranges=0.0.0.0/0 --target-tags=vpn-server
+```
+{{< rawhtml >}}
+<!--
+- Cloud Router
+  ```shell
+  gcloud compute routers create my-cloud-router \
+  --network=default \
+  --asn=65000
+  ```
+- Cloud NAT
+  ```shell
+  gcloud compute routers nats create my-nat \
+  --router=my-cloud-router \
+  --auto-allocate-nat-external-ips \
+  --nat-all-subnet-ip-ranges
+  ```
+-->
+{{< /rawhtml >}}
 
 ## Ubuntu Prerequisites
 
@@ -108,25 +187,12 @@ gcloud compute ssh \
   wg-server
 ```
 
-Stop AppArmor, install packages, and enable IP forwarding.
-
-```shell
-apt update
-apt install -y \
-  wireguard-go wireguard-tools qrencode \
-  iputils-ping net-tools iptables \
-  bash-completion vim tmux
-systemctl stop apparmor
-echo "net.ipv4.ip_forward=1" | tee -a /etc/sysctl.conf
-# ensure bash completion works
-exit
-sudo su -
-```
+After the reboot, we will create the VPN server and client configuration files.
 
 ## Configure Interfaces and Wireguard
 
 Next, we configure our wireguard interface.
-This time, we create the configuration file and use `wg-quick` to spin it up.
+This time, we create the configuration files and use `wg-quick` to spin up the interface.
 
 ### Configure Network Interfaces
 
@@ -144,40 +210,50 @@ wg genkey | tee iphone-privatekey | wg pubkey > iphone-publickey
 ```
 
 Write the `wg0.conf` and `iphone.conf` files.
-
-TODO: change `iptables` to `nft`
+The server configuration includes masquerading rules to forward traffic
+that is incoming from the tunnel to the internet.
+Later, we will test that our phone can actually still browse :blush:
 
 ```shell
+# set keys as environment variables
+server_priv=$(<"server-privatekey")
+server_pub=$(<"server-publickey")
+server_wg_ip="172.16.42.1"
+server_ext_ip=$(gcloud compute instances describe wg-server --zone=northamerica-northeast2-a --format='get(networkInterfaces[0].accessConfigs[0].natIP)')
+iphone_priv=$(<"iphone-privatekey")
+iphone_pub=$(<"iphone-publickey")
+iphone_wg_ip="172.16.42.42/32"
+
 cat <<EOF > wg0.conf
 ### WireGuard VPN Server
 [Interface]
-# IP range  for client devices
-Address = 172.16.42.1/24
+# IP range for client devices
+Address = $server_wg_ip/24
 ListenPort = 51820
 # server private key
-PrivateKey = secret
+PrivateKey = $server_priv
 PostUp = iptables -A FORWARD -i wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -o ens4 -j MASQUERADE
 PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -o ens4 -j MASQUERADE
 
 [Peer]
 # for iPhone
-PublicKey = secret
+PublicKey = $iphone_pub
 # IP to assign the iPhone
-AllowedIPs = 172.16.42.42/32
+AllowedIPs = $iphone_wg_ip
 EOF
 
 cat <<EOF > iphone.conf 
 ### iphone client
 [Interface]
 # iphone private key
-PrivateKey = secret
-Address = 172.16.42.42/32
-DNS = 8.8.8.8
+PrivateKey = $iphone_priv
+Address = $iphone_wg_ip
+DNS = 172.16.42.1
  
 [Peer]
 # WG server public key
-PublicKey = secret
-Endpoint = 34.130.150.46:51820
+PublicKey = $server_pub
+Endpoint = $server_ext_ip:51820
 AllowedIPs = 0.0.0.0/0
 PersistentKeepalive = 15
 EOF
@@ -185,156 +261,109 @@ EOF
 
 View the current wireguard configuration.
 
+  > :bulb: In my case, a reboot was in order. Without it, `wg` would show me the error:
+    `Unable to list interfaces: Permission denied`
+
 ```shell
 # View wireguard config
 wg
-# equivalent to
-wg show
 
 # example output
 interface: wg0
-  listening port: 51820
-```
-
-Define the VPN tunnel on `Hamburg`. Ensure the port matches the `wg` output from the peer.
-
-```shell
-# On Hamburg
-#
-# As arguments, use the public_key, wg0 IP, and ens4 IP from peer-b
-wg set wg0 peer 9O/Wm3NJeinXGKk5s6sqtOS/rKWf7z45Nc2mFRecKUw= allowed-ips 192.168.2.2 endpoint 10.128.0.3:51820
-
-# View configuration
-wg
-
-# example output
-interface: wg0
-  listening port: 51820
-
-peer: 9O/Wm3NJeinXGKk5s6sqtOS/rKWf7z45Nc2mFRecKUw=
-  endpoint: 10.128.0.3:51820
-  allowed ips: 192.168.2.2/32
-```
-
-Generate the QR code for your iPhone.
-
-```shell
-qrencode -t ansiutf8 < iphone.conf
-```
-
-Ping the iPhone through the tunnel to confirm reachability.
-
-```shell
-# On server
-ping 172.16.42.42
-PING 172.16.42.42(172.16.42.42) 56(84) bytes of data.
-
-```
-
-Finally, inspect the tunnel status with wireguard.
-
-```shell
-# show tunnel status with wireguard
-wg
-
-# example output
-interface: wg0
-  public key: rXiDojveu4Q6VVIzw2Pm1LFBJLbeWSV6rc/MQqcpWlE=
+  public key: pAhfFR80M5ZHpgkFrmSPt9hy519F39QbLUtIodlG0X8=
   private key: (hidden)
   listening port: 51820
 
-peer: 9O/Wm3NJeinXGKk5s6sqtOS/rKWf7z45Nc2mFRecKUw=
-  endpoint: 10.128.0.3:51820
-  allowed ips: 192.168.2.2/32
-  latest handshake: 1 minute, 35 seconds ago
-  transfer: 1.05 KiB received, 1.23 KiB sent
+peer: okNQnBt1xpJoDztwPQ8op9fRzbOxAbEf5dNV1lS9bR4=
+  allowed ips: 172.16.42.42/32
 ```
 
-Here is the video of the steps above.
+### DNS Resolver
 
-WG Server Video:
+Configure the VPN server as a DNS resolver with [unbound](https://nlnetlabs.nl/projects/unbound/about/).
+
+```shell
+# unbound config
+cat <<EOF > /etc/unbound/unbound.conf.d/wg.conf
+server:
+  access-control: 172.16.42.0/24 allow
+  interface: 127.0.0.1
+  interface: 172.16.42.1
+  logfile: "/var/log/unbound/unbound.log"
+  verbosity: 1
+  log-queries: yes
+EOF
+
+# create the log dir and file
+mkdir -p /var/log/unbound/
+chown unbound: /var/log/unbound/
+touch /var/log/unbound/unbound.log
+chown unbound: /var/log/unbound/unbound.log
+chmod 640 /var/log/unbound/unbound.log
+
+# restart the service
+systemctl restart unbound
+
+# verify
+netstat -tulpn
+```
+
+### QR codes
+
+Generate the QR code for your VPN client (iPhone).
+The QR code will show in your terminal.
+You can find a video in the next section.
+
+```shell
+# Scan the code to connect your phone to the VPN server
+qrencode -t ansiutf8 < iphone.conf
+```
+
+Before we change to the iPhone, let's create another QR code for our simple web page
+hosted with [Caddy](https://caddyserver.com) on our VPN server.
+This way, we can easily confirm access to resources on our server.
+
+```shell
+# Once we have iPhone to VPN server connected, scan this code to ensure
+# we can see the Caddy sample web page from our VPN server
+qrencode -t ansiutf8 "http://172.16.42.1:80/"
+```
+
+It is time! :hourglass_flowing_sand:
+
+Let's connect to our VPN server and surf :surfer: the interwebs :spider_web: through our tunnel :star_struck:.
+
+## Connect your iPhone
+
+Install the [WireGuard app](https://apps.apple.com/ca/app/wireguard/id1441195209)
+on your phone.
+
+- Open the app
+- Tap the :heavy_plus_sign: "Plus" sign
+- Tap "Create from QR code"
+- Scan the QR code
+- Name the tunnel and tap "Save"
+- Tap the profile slider to enable the tunnel
+
+Scan the other (smaller) QR code with your Camera app to open your Caddy
+sample web page, which is hosted on your VPN server.
+
+Finally, try browsing some public site.
 
 This is what it looks like on the iPhone.
 
 iPhone Video:
 
-## Reflection So Far
+{{< video src="wireguard-go-iphone" >}}
 
-Well, that was pretty easy and straightforward 😄.
-
-We did have to type quite a few commands though. Here is a summary of the WireGuard-related steps.
-We used:
-
-- three `ip` commands to bring up the network interface, and
-- three `wg` commands to configure WireGuard
-
-```shell
-# summary of WireGuard-related commands
-modprobe -v wireguard
-ip link add dev wg0 type wireguard
-ip address add dev wg0 $WGIP/24
-cd /etc/wireguard
-umask 077
-wg genkey | tee privatekey | wg pubkey > publickey
-wg set wg0 private-key /etc/wireguard/privatekey listen-port 51820
-ip link set up dev wg0
-wg set wg0 peer 9O/Wm3NJeinXGKk5s6sqtOS/rKWf7z45Nc2mFRecKUw= allowed-ips 192.168.2.2 endpoint 10.128.0.3:51820
-```
-
-Can the commands be streamlined after our one-time setup?
-
-## WireGuard Provides
-
-It is quick and easy setting up the tunnel interface with `wg-quick`.
-Now, that we have our configuration, we can save it to a file.
-That way, we can quickly bring up the tunnel with a single command.
-
-```shell
-# save current wg configuration to a file
-cd /etc/wireguard
-touch wg0.conf
-wg-quick save wg0
-```
-
-The `wg-quick` tool allows us to quickly bring our interface `wg0` up/down.
-You can explore this with the following commands.
-
-```shell
-# bring the interface down
-wg-quick down wg0
-# example output
-[#] ip link delete dev wg0
-
-# verify
-ip addr show wg0
-
-# bring it up
-wg-quick up wg0
-# example output
-[#] ip link add wg0 type wireguard
-[#] wg setconf wg0 /dev/fd/63
-[#] ip -4 address add 192.168.2.1/24 dev wg0
-[#] ip link set mtu 1380 up dev wg0
-
-# verify
-ip addr show wg0
-wg show
-```
-
-Neat! :star_struck:
-
-And, if you want to add it as a systemd service:
-
-```shell
-sudo systemctl enable wg-quick@wg0.service
-sudo systemctl daemon-reload
-```
-
-Cool, cool, cool! :nerd_face:
+Sweet!
 
 ## Summary
 
-WireGuard delivers what it promises.
-It is a fantastic way to create a secure VPN tunnel these days!
+It is pretty easy to set up your personal VPN server for your mobile
+devices. Together with the unbound DNS resolver, we have a pretty
+solid combination that doesn't require much configuration.
+This setup could be enhanced to be closer to the Pi-hole project, for example,
+to have our VPN server also act as a [DNS sinkhole](https://en.wikipedia.org/wiki/DNS_sinkhole).
 
-If you are interested how WireGuard's performance compares to IPsec and OpenVPN, check [this](https://www.wireguard.com/performance/) out.
+Take care on the interwebs!
