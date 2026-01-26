@@ -8,21 +8,36 @@ draft = true
 
   > :bulb: Disclaimer: This article reflects solely my opinion.
 
-Sometimes, the flexibility of installing another vendor's product in Google Cloud
-can be a good option.
+Generally speaking, if a vendor like Microsoft offers products or services,
+including but not limited to to Windows Server and SQL Server, the integration
+and ease of use with the same vendor's cloud, i.e., Azure, will be the best in terms of flexibility and
+seamlessness.
+But sometimes, the flexibility of installing another vendor's product in the Google Cloud Platform (GCP)
+can be a good option. For example, when your application that is already running
+on Google needs to connect to Microsoft SQL Server database close by.
 
-Is it for MS SQL though? Let's find out.
+Is running MS SQL in Google a good option? Let's find out.
 
 Google offers the SQL Server editions: Express, Web, Standard, and Enterprise.
 Each for the 2017, 2019, and 2022 releases of SQL Server.
-For this exploration, we define two scenarios:
+For this exploration, we examine two scenarios:
 
 - the replication conundrum, and
 - the account management conundrum.
 
+The above scenarios are worth further investigation as implementation details
+matter when it comes to productionizing SQL Server in GCP.
+How replication and disaster failover actually works matters in Production.
+So does the account management and integration options, if any, with your
+central Identity Platform (IdP).
+
 ## The Replication Conundrum
 
-Cloud SQL for SQL Server offers replication between instances.
+Cloud SQL for SQL Server offers replication between instances, which can be
+considered a standard feature for Enterprise usage.
+Replication enables well-established architecture patterns. For example,
+running the primary SQL Server in a your primary GCP region (e.g., `northamerica-northeast2` - Toronto),
+and a SQL Server read replica in a different GCP region e.g., `northamerica-northeast1` - Montréal. 
 How exactly though is replication offered and what are the implications and limitations?
 We will explore this with the following resources:
 
@@ -411,7 +426,8 @@ vault write database/roles/my-role \
     creation_statements="CREATE LOGIN [{{name}}] WITH PASSWORD = '{{password}}';\
         USE acme CREATE USER [{{name}}] FOR LOGIN [{{name}}];\
         GRANT SELECT ON SCHEMA::dbo TO [{{name}}];" \
-    revocation_statements="USE acme DROP USER IF EXISTS [{{name}}]" \
+    revocation_statements="USE acme DROP USER IF EXISTS [{{name}}];\
+        USE master DROP LOGIN [{{name}}];" \
     default_ttl="30m" \
     max_ttl="24h"
 
@@ -425,20 +441,41 @@ vault read database/creds/my-role
 
 Key                Value
 ---                -----
-lease_id           database/creds/my-role/OvxyXJ4vGZMiFiBBRHQuJTa9
+lease_id           database/creds/my-role/9jFQz0AV1UPAKYBm7I5AzL90
 lease_duration     30m
 lease_renewable    true
-password           dKxgHLUDrgrbtqi0-kfi
-username           v-root-my-role-UxC8G0xbsDX64AL7cGTJ-1769296659
+password           7MBK6OguP24xMf4-OVJM
+username           v-root-my-role-FEWE2ejlHFCalfLd9SNC-1769437222
 ```
 
 The account above was created in our Cloud SQL instance.
-If it isn't actively renewed, it expires after the specified time to live parameter `default_ttl` and will be dropped from the database.
+If it isn't actively renewed, it expires after the specified time-to-live (TTL) parameter `default_ttl` and will be dropped from the database.
 
 ## Summary
 
-SQL Server on Google Cloud SQL has important limitations.
+The feature set of SQL Server on Google Cloud SQL has important implications.
 
-- A
-- B
-- C
+While you can technically integrate with Active Directory, the current options
+have big architecture implications. Either by running an additional Google service
+called Microsoft Managed AD, which then establishes a one-way trust relationship
+with your existing Active Directory, or, by opening a whole bunch of TCP and UDP
+ports on all of your AD Domain Controllers from all your Google SQL Server instances.
+
+The upcoming, in public preview, integration with Entra ID may solve some of these
+implications. It remains to be seen when the Entra ID integration would also work
+for Cloud SQL instances provisioned with Private Service Connect as their only
+connectivity option. 
+
+Similarly, and dependent on the above, a central account management in Google SQL
+Server can become more involved in comparison to other services that can directly
+integrate with Google IAM. When the integration with AD is not an option, e.g., for
+security, regulatory, or architectural reasons, the alternative can be the database
+secrets engine from HashiCorp Vault. This Vault integration allows for dynamic database
+credential provisioning and revocation.
+
+Vault is a powerful holistic secrets management solution that might already be
+integrated with your Identity Platform and by proxy enable a centralized account
+management.
+
+A lot to think through and plan. Feel free to explore yourself and revisit the
+latest feature set as things change fast.
