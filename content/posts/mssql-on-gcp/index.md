@@ -189,7 +189,7 @@ VAULT_USER="vault"
 
 echo "=== Installing dependencies ==="
 apt-get update -y
-apt-get install -y curl unzip
+apt-get install -y curl unzip iputils-ping tmux vim
 
 echo "=== Creating vault user ==="
 if ! id "$VAULT_USER" >/dev/null 2>&1; then
@@ -202,29 +202,38 @@ curl -fsSL "$VAULT_URL" -o /tmp/vault.zip
 echo "=== Installing Vault binary ==="
 unzip -o /tmp/vault.zip -d /tmp
 install -m 0755 /tmp/vault "$VAULT_BIN"
+setcap cap_ipc_lock=+ep "$VAULT_BIN"
 
 echo "=== Creating directories ==="
 mkdir -p "$VAULT_DATA_DIR" "$VAULT_CONFIG_DIR"
 chown -R "$VAULT_USER:$VAULT_USER" /opt/vault /etc/vault.d
 chmod 750 "$VAULT_DATA_DIR"
 
-echo "=== Writing Vault config ==="
+
+if [ -s "/etc/systemd/system/vault.service" ]; then
+  echo "Vault config exists already."
+else
+  echo "=== Writing Vault config ==="
 cat > "$VAULT_CONFIG_FILE" <<EOF
 storage "file" {
   path = "$VAULT_DATA_DIR"
 }
 
 listener "tcp" {
-  address     = "127.0.0.1:8200"
+  address     = "0.0.0.0:8200"
   tls_disable = 1
 }
 
 ui = true
 EOF
+fi
 
 chown "$VAULT_USER:$VAULT_USER" "$VAULT_CONFIG_FILE"
 chmod 640 "$VAULT_CONFIG_FILE"
 
+if [ -s "/etc/systemd/system/vault.service" ]; then
+  echo "vault.service is not empty (has a size greater than zero)."
+else
 echo "=== Creating systemd service ==="
 cat > /etc/systemd/system/vault.service <<EOF
 [Unit]
@@ -236,15 +245,18 @@ After=network-online.target
 [Service]
 User=$VAULT_USER
 Group=$VAULT_USER
+Environment="VAULT_LOG_LEVEL=debug"
 ExecStart=$VAULT_BIN server -config=$VAULT_CONFIG_FILE
 ExecReload=/bin/kill --signal HUP \$MAINPID
 KillMode=process
 Restart=on-failure
 LimitNOFILE=65536
+LimitMEMLOCK=infinity
 
 [Install]
 WantedBy=multi-user.target
 EOF
+fi
 
 echo "=== Starting Vault ==="
 systemctl daemon-reexec
@@ -257,11 +269,18 @@ export VAULT_ADDR="$VAULT_ADDR"
 echo "=== Waiting for Vault to start ==="
 sleep 5
 
-echo "=== Initializing Vault ==="
-vault operator init -key-shares=1 -key-threshold=1 > /root/vault-init.txt
+INIT_FILE="/root/vault-init.txt"
+if [ -s "$INIT_FILE" ]; then
+  echo === Vault initialized already ===
+  echo "$INIT_FILE is not empty (has a size greater than zero)."
+else
+  echo "=== Initializing Vault ==="
+  vault operator init -key-shares=1 -key-threshold=1 > $INIT_FILE
+  cp $INIT_FILE /root/vault-init.bak
+fi
 
-UNSEAL_KEY=$(awk '/Unseal Key 1:/ {print $4}' /root/vault-init.txt)
-ROOT_TOKEN=$(awk '/Initial Root Token:/ {print $4}' /root/vault-init.txt)
+UNSEAL_KEY=$(awk '/Unseal Key 1:/ {print $4}' $INIT_FILE)
+ROOT_TOKEN=$(awk '/Initial Root Token:/ {print $4}' $INIT_FILE)
 
 echo "Unseal Key: $UNSEAL_KEY"
 echo "Root Token: $ROOT_TOKEN"
@@ -279,7 +298,7 @@ echo "=== Vault status ==="
 vault status
 
 echo "=== Done ==="
-echo "Initialization details saved to /root/vault-init.txt"
+echo "Initialization details saved to $INIT_FILE"
 ```
 
 #### GCE Instance Config
@@ -317,11 +336,52 @@ firewall-rules create allow-vault \
 
 ### Vault Prerequisites
 
-We need to configure the Vault database secrets engine and policies.
+First, we grant Vault the required permissions on the MS SQL instance.
+Then, we configure the Vault database secrets engine and policies.
 
-#### Prepare the Instance
+#### Vault User in MS SQL
 
-Connect to the GCE instance.
+Connect to your MS SQL instance with Cloud SQL Studio.
+Create a database called `acme`.
+
+```sql
+-- Create Login
+CREATE LOGIN vault_login WITH PASSWORD = 'yourStrong123Password#';
+
+-- Create User works in acme, fails in master
+CREATE user vault_user for login vault_login;
+
+-- Grant Permissions, fails in acme, fails in master
+-- GRANT ALTER ANY LOGIN TO "vault_user";
+
+-- works in master, but was supposed to be vault_user, not vault_login
+GRANT ALTER ANY LOGIN TO "vault_login" AS CustomerDbRootRole;
+
+-- works in acme
+GRANT ALTER ANY USER TO "vault_user";
+
+-- fails in acme, fails in master with Grantor does not have GRANT permission.
+-- GRANT ALTER ANY CONNECTION TO "vault_login";
+-- works in master
+GRANT ALTER ANY CONNECTION TO "vault_login" AS CustomerDbRootRole;
+
+-- works in acme
+GRANT CONTROL ON SCHEMA::dbo TO "vault_user";
+-- works in acme
+EXEC sp_addrolemember "db_accessadmin", "vault_user";
+
+-- master
+ALTER SERVER ROLE CustomerDbRootRole ADD MEMBER [vault_login]
+
+-- acme 
+ALTER ROLE [db_accessadmin] ADD MEMBER [vault_user];
+EXEC sp_addrolemember "db_accessadmin", "vault_user";
+ALTER ROLE [db_securityadmin] ADD MEMBER [vault_user];
+```
+
+#### Prepare Vault
+
+Connect to the GCE instance `vault`.
 
 ```shell
 # replace $CLOUDSDK_CORE_PROJECT with your GCP project or set the variable
@@ -329,6 +389,51 @@ gcloud compute ssh \
   --tunnel-through-iap --project $CLOUDSDK_CORE_PROJECT \
   vault
 ```
+
+Configure the Vault MS SQL plugin.
+
+```shell
+vault write database/config/my-mssql-database \
+    plugin_name=mssql-database-plugin \
+    connection_url='sqlserver://{{username}}:{{password}}@10.122.144.6:1433' \
+    allowed_roles="my-role" \
+    username="vault_login" \
+    password="yourStrong123Password#"
+
+Success! Data written to: database/config/my-mssql-database
+```
+
+Define a role that maps its name to a SQL statement for database credential creation.
+
+```shell
+vault write database/roles/my-role \
+    db_name=my-mssql-database \
+    creation_statements="CREATE LOGIN [{{name}}] WITH PASSWORD = '{{password}}';\
+        USE acme CREATE USER [{{name}}] FOR LOGIN [{{name}}];\
+        GRANT SELECT ON SCHEMA::dbo TO [{{name}}];" \
+    revocation_statements="USE acme DROP USER IF EXISTS [{{name}}]" \
+    default_ttl="30m" \
+    max_ttl="24h"
+
+Success! Data written to: database/roles/my-role
+```
+
+Generate a dynamic database credential by reading from the new Vault role.
+
+```shell
+vault read database/creds/my-role
+
+Key                Value
+---                -----
+lease_id           database/creds/my-role/OvxyXJ4vGZMiFiBBRHQuJTa9
+lease_duration     30m
+lease_renewable    true
+password           dKxgHLUDrgrbtqi0-kfi
+username           v-root-my-role-UxC8G0xbsDX64AL7cGTJ-1769296659
+```
+
+The account above was created in our Cloud SQL instance.
+If it isn't actively renewed, it expires after the specified time to live parameter `default_ttl` and will be dropped from the database.
 
 ## Summary
 
