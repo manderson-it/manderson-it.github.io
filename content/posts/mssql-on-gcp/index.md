@@ -2,47 +2,32 @@
 title = 'Microsoft SQL Server on GCP'
 date = 2026-01-23T08:44:09-05:00
 showtoc = true
-draft = true
+draft = false
 +++
 ## Microsoft SQL Server with Google Cloud SQL
 
   > :bulb: Disclaimer: This article reflects solely my opinion.
 
-Generally speaking, if a vendor like Microsoft offers products or services,
-including but not limited to to Windows Server and SQL Server, the integration
-and ease of use with the same vendor's cloud, i.e., Azure, will be the best in terms of flexibility and
-seamlessness.
-But sometimes, the flexibility of installing another vendor's product in the Google Cloud Platform (GCP)
-can be a good option. For example, when your application that is already running
-on Google needs to connect to Microsoft SQL Server database close by.
+Generally speaking, when a vendor like Microsoft offers products or services—such as Windows Server and SQL Server—the tightest integration and greatest ease of use will usually come from using that vendor’s own cloud platform, in this case Microsoft Azure. This is often where you’ll find the most seamless experience and the highest degree of flexibility.
+However, there are situations where deploying another vendor’s product on a different cloud platform, such as Google Cloud Platform (GCP), can be a strong option. For example, if you have an application already running on Google Cloud that needs low-latency access to a Microsoft SQL Server database, hosting SQL Server close to that application within GCP can provide performance and architectural benefits.
 
-Is running MS SQL in Google a good option? Let's find out.
+Is running Microsoft SQL Server on Google Cloud a good option? Let’s find out.
 
-Google offers the SQL Server editions: Express, Web, Standard, and Enterprise.
-Each for the 2017, 2019, and 2022 releases of SQL Server.
-For this exploration, we examine two scenarios:
+Google Cloud offers multiple SQL Server editions—Express, Web, Standard, and Enterprise—across the 2017, 2019, and 2022 releases of SQL Server.
+In this exploration, we focus on two key scenarios:
+- The replication conundrum
+- The account management conundrum
 
-- the replication conundrum, and
-- the account management conundrum.
-
-The above scenarios are worth further investigation as implementation details
-matter when it comes to productionizing SQL Server in GCP.
-How replication and disaster failover actually works matters in Production.
-So does the account management and integration options, if any, with your
-central Identity Platform (IdP).
+These scenarios warrant deeper investigation, because implementation details are critical when you’re running SQL Server in GCP in a production environment. How replication and disaster failover actually work has a direct impact on availability and recovery objectives. Likewise, account management—and any integration options with your central identity provider (IdP)—is essential for secure, scalable access control and operational consistency.
 
 ## The Replication Conundrum
 
-Cloud SQL for SQL Server offers replication between instances, which can be
-considered a standard feature for Enterprise usage.
-Replication enables well-established architecture patterns. For example,
-running the primary SQL Server in a your primary GCP region (e.g., `northamerica-northeast2` - Toronto),
-and a SQL Server read replica in a different GCP region e.g., `northamerica-northeast1` - Montréal. 
-How exactly though is replication offered and what are the implications and limitations?
-We will explore this with the following resources:
+Cloud SQL for SQL Server offers replication between instances, which can be considered a standard feature for enterprise workloads. Replication enables well-established architectural patterns. For example, you might run the primary SQL Server instance in your primary GCP region (e.g., `northamerica-northeast2` – Toronto) and a SQL Server read replica in a secondary GCP region (e.g., `northamerica-northeast1` – Montréal).
 
-- Primary SQL Server
-- Read replica SQL Server (different region)
+But how exactly is replication implemented, and what are the implications and limitations in practice? We will explore this using the following resources:
+
+- Primary SQL Server instance
+- Read replica SQL Server instance in a different region
 
 {{< rawhtml >}}
 <!--
@@ -74,12 +59,11 @@ SQLPRI-\->|replication|SQLREP
 
 ### Our Environment
 
-:warning: It is for demonstration purposes only.
+:warning: This setup is for demonstration purposes only.
 
-We need two Cloud SQL instances representing: (1) the primary MS SQL Server, and (2) the read replica.
+We provision two Cloud SQL instances to represent: (1) the primary Microsoft SQL Server and (2) the read replica.
 
-We streamline the instance configuration by providing an instance startup script.
-It installs packages, disables AppArmor, and enables IP forwarding at the OS-level.
+To streamline configuration, we use an instance startup script that installs required packages, disables AppArmor, and enables IP forwarding at the operating system level.
 
 ### Primary SQL Server
 
@@ -90,9 +74,13 @@ An overview of the primary SQL Server.
 - Cloud SQL Edition: `Enterprise Plus`
 - Region: `northamerica-northeast2` Toronto
 
+Below are the corresponding screenshots from the Google Cloud Console.
+
 [![Primary SQL Server creation part one](/images/mssql-on-gcp-create-primary-1.png)](/images/mssql-on-gcp-create-primary-1.png)
 
 [![Primary SQL Server creation part two](/images/mssql-on-gcp-create-primary-2.png)](/images/mssql-on-gcp-create-primary-2.png)
+
+Next, let's set up a read replica.
 
 ### Read replica SQL Server
 
@@ -101,19 +89,22 @@ An overview of the primary SQL Server.
 - Cloud SQL Edition: `Enterprise Plus`
 - Region: `northamerica-northeast1` Montréal
 
-  > :bulb: "Multiple zones (Highly available)" is grayed out and shows on mouse hover "Not supported for read replicas".
+  > :bulb: The "Multiple zones (Highly available)" option is grayed out and, on hover, displays "Not supported for read replicas."
 
-This is due to the fact that Cloud SQL uses [SQL Server Read Scale Availability Groups](https://learn.microsoft.com/en-us/sql/database-engine/availability-groups/windows/read-scale-availability-groups?view=sql-server-linux-2017#read-scale-availability-groups-without-cluster).
+This is because Cloud SQL for SQL Server uses [SQL Server Read Scale Availability Groups](https://learn.microsoft.com/en-us/sql/database-engine/availability-groups/windows/read-scale-availability-groups?view=sql-server-linux-2017#read-scale-availability-groups-without-cluster).
 
 [![Read replica SQL Server creation part one](/images/mssql-on-gcp-create-replica-1.png)](/images/mssql-on-gcp-create-replica-1.png)
 
 [![Read replica SQL Server creation part one](/images/mssql-on-gcp-create-replica-2.png)](/images/mssql-on-gcp-create-replica-2.png)
 
-Alternatively, you can set up Advanced Disaster Recovery that simplifies the recovery
-and also the fallback if a region is affected.
-Advanced DR requires the Cloud SQL Enterprise Edition and a [cascadable replica](https://docs.cloud.google.com/sql/docs/sqlserver/intro-to-cloud-sql-disaster-recovery#cascadable-replicas).
+As an alternative, you can configure Advanced Disaster Recovery (Advanced DR), which simplifies both recovery
+and fallback when a region is affected.
+Advanced DR requires:
+- the Cloud SQL Enterprise Plus, and
+- a [cascadable replica](https://docs.cloud.google.com/sql/docs/sqlserver/intro-to-cloud-sql-disaster-recovery#cascadable-replicas).
+
 However, the [cascadable replica](https://docs.cloud.google.com/sql/docs/sqlserver/intro-to-cloud-sql-disaster-recovery#cascadable-replicas) is also zonal, even though
-the Google documentation suggests differently (as of January 23, 2026).
+the Google documentation suggests otherwise (as of January 23, 2026).
 
 Let's summarize the replication implications.
 
@@ -128,35 +119,49 @@ for the job ready.
 A lot of companies use Terraform for provisioning; however, Terraform is
 not a good tool when it comes to post-deployment configuration management.
 
+A disaster recovery (DR) SQL Server instance that can only be provisioned as a zonal replica
+warrants careful consideration—and the same applies to an Advanced DR setup.
+While you can promote a replica to become the primary instance and then enable high availability on it,
+doing so requires thoughtful planning and the right operational tools.
+
+Many organizations use Terraform for provisioning, but Terraform is not well suited for ongoing,
+post-deployment configuration management.
+You’ll likely need complementary tools or processes
+(such as configuration management, scripting, or orchestration frameworks)
+to manage failover, promotion, and reconfiguration reliably in production.
+
 ## The Account Management Conundrum
 
-Google offers what they can, which is GCP [Microsoft Managed AD](https://docs.cloud.google.com/sql/docs/sqlserver/ad)
-and [Customer-managed Active Directory (CMAD)](https://docs.cloud.google.com/sql/docs/sqlserver/cmad), which is the customer's AD, e.g., running on-premises.
+Google offers two main options for integrating SQL Serer with Active Directory (AD) in GCP:
+- GCP [Microsoft Managed AD](https://docs.cloud.google.com/sql/docs/sqlserver/ad)
+- [Customer-managed Active Directory (CMAD)](https://docs.cloud.google.com/sql/docs/sqlserver/cmad),
+  which uses the customer's own AD (e.g., running on-premises).
 
-I would argue that both options are challenging for a lot of client since
-they have severe technical limitations and implications.
-Especially, if a client has strong regulatory and security requirements,
-these options are likely a no-go.
+Both options can be challenging for many clients because they come with significant technical
+limitations and architectural implications.
+In particular, organizations with strict regulatory and security requirements may find that these
+approaches are effectively non-starters.
 
-My select and opinionated limitations of each integration:
+Here are my selected—and opinionated—limitations of each integration option:
 
 - Microsoft Managed AD
-  - necessary but unwanted overhead "just to use" SQL Server (No one likes overhead.)
-  - requires a one-way AD trust from on-premises (No, thank you!)
+  - Introduces necessary but unwanted overhead *just to use* SQL Server (no one likes overhead.)
+  - Requires a one-way AD trust from on-premises — no, thank you.
 
 - CMAD
-  - No Private Service Connect (PSC) support
-  - Open TCP and UDP ports `53`, `88`, `135`, `389`, `445`, `464`, `3268`, `3269`, and `49152` through `65535` from Cloud SQL instances to all domain controllers
-    - No, thank you!
+  - No Private Service Connect (PSC) support.
+  - Requires opening TCP and UDP ports `53`, `88`, `135`, `389`, `445`, `464`, `3268`, `3269`, `49152-65535`
+    from Cloud SQL instances to **all** domain controllers. Again: no, thank you.
 
-In addition, [Integration with Microsoft Entra ID](https://docs.cloud.google.com/sql/docs/sqlserver/integration-with-microsoft-entra-id) is in public preview, which typically means
-that it will become generally available within six months.
-That doesn't mean that it will support all configurations immediately when it becomes GA, e.g.,
-PSC support may take longer.
+In addition, [Integration with Microsoft Entra ID](https://docs.cloud.google.com/sql/docs/sqlserver/integration-with-microsoft-entra-id)
+is currently in public preview, which typically suggests
+that it may reach general availability within about six months.
+However, that does not guarantee immediate support for all enterprise scenarios—for example,
+PSC support may arrive later.
 
-Keeping things simple, we keep building on the further above deployed SQL Server instances.
-Additionally, we need a GCE instance that will host the HashiCorp Vault server.
-Vault will be used later for dynamic database credentials with its [database secrets engine](https://developer.hashicorp.com/vault/docs/secrets/databases).
+To keep things simple, we continue building on the SQL Server instances deployed earlier.
+We also introduce a GCE instance to host a HashiCorp Vault server, which we will later use for
+dynamic database credentials via Vault’s [database secrets engine](https://developer.hashicorp.com/vault/docs/secrets/databases).
 
 {{< rawhtml >}}
 <!--
@@ -338,15 +343,16 @@ vault
 
 #### GCP VPC Firewall rule
 
-The firewall rule allows TCP traffic to our port `8200` to our `vault`
-GCE instance tagged with `vault`.
+Optionally, the firewall rule allows TCP port `8200` traffic to our `vault`
+GCE instance tagged with `vault`. We shall use the vault commands directly
+from the GCE instance.
 
 ```shell
 # replace $CLOUDSDK_CORE_PROJECT with your GCP project or set the variable
 gcloud compute --project=$CLOUDSDK_CORE_PROJECT \
 firewall-rules create allow-vault \
 --direction=INGRESS --priority=1000 --network=default --action=ALLOW \
---rules=tcp:8200 --source-ranges=99.225.69.206/32 --target-tags=vault
+--rules=tcp:8200 --source-ranges=aaa.bbb.ccc.ddd/32 --target-tags=vault
 ```
 
 ### Vault Prerequisites
@@ -453,29 +459,28 @@ If it isn't actively renewed, it expires after the specified time-to-live (TTL) 
 
 ## Summary
 
-The feature set of SQL Server on Google Cloud SQL has important implications.
+The feature set of SQL Server on Google Cloud SQL has important architectural and operational implications.
 
-While you can technically integrate with Active Directory, the current options
-have big architecture implications. Either by running an additional Google service
-called Microsoft Managed AD, which then establishes a one-way trust relationship
-with your existing Active Directory, or, by opening a whole bunch of TCP and UDP
-ports on all of your AD Domain Controllers from all your Google SQL Server instances.
+While Active Directory integration is technically supported, the current options come with significant
+design trade-offs. You either:
+- Run an additional Google-managed service (Microsoft Managed AD), which then establishes a one-way
+  trust with your existing Active Directory, or
+- Open a large range of TCP and UDP ports on all of your AD domain controllers from all of your Cloud
+  SQL for SQL Server instances.
 
-The upcoming, in public preview, integration with Entra ID may solve some of these
-implications. It remains to be seen when the Entra ID integration would also work
-for Cloud SQL instances provisioned with Private Service Connect as their only
-connectivity option. 
+The upcoming Entra ID integration (currently in public preview) may address some of these concerns.
+However, it remains unclear when—or if—that integration will fully support Cloud SQL instances that
+are reachable **only** via Private Service Connect (PSC).
 
-Similarly, and dependent on the above, a central account management in Google SQL
-Server can become more involved in comparison to other services that can directly
-integrate with Google IAM. When the integration with AD is not an option, e.g., for
-security, regulatory, or architectural reasons, the alternative can be the database
-secrets engine from HashiCorp Vault. This Vault integration allows for dynamic database
-credential provisioning and revocation.
+Similarly, and closely related to the above, centralized account management for Cloud SQL for SQL
+Server can be more complex than for services that integrate directly with Google IAM.
+When AD integration is not a viable option—due to security, regulatory, or architectural constraints—an
+alternative is to use the database secrets engine in HashiCorp Vault.
+This approach enables dynamic database credential provisioning and revocation.
 
-Vault is a powerful holistic secrets management solution that might already be
-integrated with your Identity Platform and by proxy enable a centralized account
-management.
+Vault is a powerful, holistic secrets management platform that may already be integrated with your
+central identity provider, effectively enabling centralized account management for SQL Server as well.
 
-A lot to think through and plan. Feel free to explore yourself and revisit the
-latest feature set as things change fast.
+There is a lot to think through and plan.
+It's worth experimenting in your own environment and periodically revisiting the latest feature set
+and documentation—things in this space evolve quickly.
